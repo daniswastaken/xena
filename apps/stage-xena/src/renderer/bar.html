@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; media-src 'self' data:" />
+    <title>Xena Bar</title>
+    <link rel="stylesheet" href="./styles/bar.css" />
+  </head>
+  <body>
+    <div id="bar-root">
+      <div id="bar-wrap" class="hidden">
+        <div id="answer" class="hidden"></div>
+        <div id="bar">
+          <span id="bar-dot"></span>
+          <input
+            id="bar-input"
+            type="text"
+            placeholder="Ask Xena…  (/look shares screen, /clear resets)"
+            maxlength="2000"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+      </div>
+    </div>
+    <script src="./bar.js"></script>
+  </body>
+</html>

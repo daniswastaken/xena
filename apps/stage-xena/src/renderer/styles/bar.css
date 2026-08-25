@@ -1,0 +1,125 @@
+:root {
+  --xena-accent: #2e86de;
+  --xena-panel: rgba(16, 20, 28, 0.92);
+  --xena-text: #eef2f7;
+  --xena-muted: #9aa7b8;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: var(--xena-text);
+  user-select: none;
+}
+
+/* Content anchored to the bottom so the bar hugs the avatar below. */
+#bar-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 10px 12px 10px;
+}
+
+#bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+#bar-wrap.hidden {
+  display: none;
+}
+
+#bar-wrap.fading {
+  opacity: 0;
+}
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--xena-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+#bar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--xena-accent);
+  flex: none;
+}
+
+#bar-dot.busy {
+  animation: xena-pulse 1s ease-in-out infinite;
+}
+
+@keyframes xena-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+#bar-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--xena-text);
+  font-size: 14px;
+  user-select: text;
+}
+
+#bar-input::placeholder {
+  color: var(--xena-muted);
+}
+
+#answer {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--xena-text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  background: rgba(10, 13, 18, 0.55);
+  border-radius: 12px;
+  scrollbar-width: thin;
+  user-select: text;
+  cursor: text;
+}
+
+#answer.hidden {
+  display: none;
+}
+
+#answer.error {
+  color: #ffb4a8;
+}

@@ -170,4 +170,15 @@ PNGs with transparency, square canvas, same size across set (1024x1024 recommend
 
 ## Current Status
 
-Greenfield. Nothing built. Next action: scaffold Electron app skeleton (v0.1).
+**v0.1 — Alive: COMPLETE (2026-08-25).**
+- Monorepo scaffolded per layout; pnpm workspaces; esbuild bundling; strict TS all green.
+- Vision probe done: `oc/x-preview-f-free` accepts images (upstream `mimo-v2.5-free`) — see `docs/vision-models.md`.
+- Electron overlay live: bottom-right, transparent, always-on-top, click-through, tray, drag via avatar.
+- Chat E2E verified on-screen: streamed reply rendered, token-flap working, JSON transcript persisted to `data/`.
+- `/look <question>` wired AND E2E verified: desktopCapturer → JPEG → vision model → correct on-screen description.
+- Footprint: ~234 MB private across 4 electron processes (target ≤300 MB).
+- v0.5 polish landed early: face sprites (eyes/mouth states + badge), chat header + close, typing indicator, auto-open on reply, friendly 9Router-down error, Ctrl+Alt+X global hotkey, tray left-click, single-instance lock, `/clear` command, persona v2 (corner-gremlin voice) — all verified on-screen via CDP + screenshots.
+- v1.5 voice landed early: `packages/tts` (free Edge read-aloud, no key), assistant + `/look` replies spoken, mouth flap synced to audio duration, Voice ON/OFF in tray, persisted settings — CDP-verified.
+- v2.0 landed early: proactive idle comments (45min idle + cooldown + quiet-hours gate, tray toggle, env-gated dev thresholds) + daily session rotation — verified with test thresholds, full in-character comment delivered.
+- UI v3 "Summon Bar" (2026-08-25): chat box REMOVED. Two-window design — avatar window permanently bottom-right and fully click-through; separate transparent bar window (Spotlight-style single-line input + inline streaming answer). Triggers: Ctrl+Alt+X (above avatar) or cursor-shake (>=4 axis reversals/700ms, bar centers on cursor). Auto-fade: 10s idle / 8s post-answer; Esc dismisses. Tray = settings surface (voice, idle comments, shake toggle, model radio submenu). Footprint ~190MB/5 procs.
+- Next: real art assets from user (replaces placeholders one-to-one). Roadmap v0.1→v2.0 all shipped.

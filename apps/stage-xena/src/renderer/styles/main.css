@@ -1,0 +1,28 @@
+:root {
+  --avatar-size: 188px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+/* Avatar pinned bottom-right; window itself is fully click-through. */
+#avatar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  pointer-events: none;
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@xena/tts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project Xena voice — free Edge read-aloud TTS",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "msedge-tts": "^2.0.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

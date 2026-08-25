@@ -2,7 +2,7 @@
   "name": "@xena/stage-xena",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "description": "Xena desktop overlay app (Electron)",
   "main": "dist/main/index.js",
   "scripts": {
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@xena/router9-client": "workspace:*",
+    "@xena/tts": "workspace:*",
     "@xena/xena-core": "workspace:*"
   },
   "devDependencies": {

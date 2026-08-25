@@ -5,8 +5,10 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - electron
+  - msedge-tts
 allowBuilds:
   esbuild: set this to true or false
+  msedge-tts: set this to true or false
 minimumReleaseAgeExclude:
   - electron@44.0.0
 verifyDepsBeforeRun: false

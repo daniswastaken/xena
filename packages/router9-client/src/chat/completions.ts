@@ -26,6 +26,39 @@ function extractContent(raw: RawResponse): string {
   return typeof msg?.content === "string" ? msg.content : "";
 }
 
+/**
+ * Router9 sometimes appends SSE frames (e.g. "data: [DONE]") even to
+ * non-streaming bodies — parse defensively.
+ */
+export function parseCompletionBody(text: string): RawResponse {
+  try {
+    return JSON.parse(text) as RawResponse;
+  } catch {
+    let cleaned = text.split(/\r?\ndata:/)[0]?.trim() ?? "";
+    if (cleaned === "") throw new Router9Error("unparseable response body", 502, text.slice(0, 300));
+    try {
+      return JSON.parse(cleaned) as RawResponse;
+    } catch {
+      // last resort: first balanced {...} block
+      const start = text.indexOf("{");
+      if (start !== -1) {
+        let depth = 0;
+        for (let i = start; i < text.length; i++) {
+          if (text[i] === "{") depth++;
+          else if (text[i] === "}") {
+            depth--;
+            if (depth === 0) {
+              cleaned = text.slice(start, i + 1);
+              return JSON.parse(cleaned) as RawResponse;
+            }
+          }
+        }
+      }
+      throw new Router9Error("unparseable response body", 502, text.slice(0, 300));
+    }
+  }
+}
+
 export async function chatComplete(
   messages: ChatMessage[],
   options: Omit<ChatRequestOptions, "messages" | "signal"> & { signal?: AbortSignal },
@@ -44,7 +77,7 @@ export async function chatComplete(
     signal: options.signal,
   });
   if (!res.ok) throw new Router9Error(res.statusText, res.status, await res.text());
-  const raw = (await res.json()) as RawResponse;
+  const raw = parseCompletionBody(await res.text());
   return {
     id: raw.id ?? "",
     model: raw.model ?? options.model,
