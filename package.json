@@ -1,0 +1,22 @@
+{
+  "name": "project-xena",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Neuro-sama-inspired AI desktop companion — corner PNGtuber overlay",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "build": "pnpm --filter @xena/stage-xena build",
+    "dev": "pnpm --filter @xena/stage-xena dev",
+    "start": "pnpm --filter @xena/stage-xena start",
+    "typecheck": "pnpm -r typecheck",
+    "gen:sprites": "node scripts/gen-sprites.mjs",
+    "probe:vision": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/probe-vision-models.ps1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

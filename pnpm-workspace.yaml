@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - esbuild
+  - electron
+allowBuilds:
+  esbuild: set this to true or false
+minimumReleaseAgeExclude:
+  - electron@44.0.0

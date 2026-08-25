@@ -1,0 +1,24 @@
+{
+  "name": "@xena/stage-xena",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Xena desktop overlay app (Electron)",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && cross-env XENA_DEV=1 electron .",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xena/router9-client": "workspace:*",
+    "@xena/xena-core": "workspace:*"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "electron": "^44.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.2"
+  }
+}

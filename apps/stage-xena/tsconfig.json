@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@xena/router9-client": ["../../packages/router9-client/src/index.ts"],
+      "@xena/xena-core": ["../../packages/xena-core/src/index.ts"]
+    }
+  },
+  "include": ["src", "../../packages/router9-client/src", "../../packages/xena-core/src"]
+}

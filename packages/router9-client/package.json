@@ -1,0 +1,20 @@
+{
+  "name": "@xena/router9-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "All 9Router API code for Project Xena — chat, vision, models",
+  "exports": {
+    ".": "./src/index.ts",
+    "./chat": "./src/chat/index.ts",
+    "./vision": "./src/vision/index.ts",
+    "./models": "./src/models/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

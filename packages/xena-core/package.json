@@ -1,0 +1,22 @@
+{
+  "name": "@xena/xena-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project Xena brain — persona, memory, conversation session",
+  "exports": {
+    ".": "./src/index.ts",
+    "./persona": "./src/persona/index.ts",
+    "./memory": "./src/memory/index.ts",
+    "./session": "./src/session/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xena/router9-client": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
