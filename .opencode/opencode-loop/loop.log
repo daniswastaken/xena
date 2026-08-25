@@ -1,0 +1,31 @@
+{"time":"2026-08-25T10:01:57.788Z","line":"add","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","label":"default: every idle -> Read C:\\Users\\daniswastaken\\Documents\\project-xena\\AGENTS.md fully and build Project Xena. perfect and expand future and beyond.","scheduleMode":"idle","scheduleSyntax":"idle-shorthand"}
+{"time":"2026-08-25T10:01:58.034Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:01:59.006Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"idle","retryMs":5000}
+{"time":"2026-08-25T10:02:42.899Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:03:12.967Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:03:18.557Z","line":"replace","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","label":"default: every idle -> Read C:\\Users\\daniswastaken\\Documents\\project-xena\\AGENTS.md fully and build Project Xena. perfect and expand future and beyond.","scheduleMode":"idle","scheduleSyntax":"idle-shorthand"}
+{"time":"2026-08-25T10:03:18.909Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":1}
+{"time":"2026-08-25T10:15:11.218Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":3}
+{"time":"2026-08-25T10:15:33.875Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":4}
+{"time":"2026-08-25T10:15:34.012Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"idle","retryMs":5000}
+{"time":"2026-08-25T10:15:36.375Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":5}
+{"time":"2026-08-25T10:16:02.135Z","line":"add","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","label":"default: every idle -> Read C:\\Users\\daniswastaken\\Documents\\project-xena\\AGENTS.md fully and build Project Xena. perfect and expand future and beyond. You're capable of image processing, so for correcting and seeing the results, you can take screenshot of the Desktop on your own then analyze them to build accordingly.","scheduleMode":"idle","scheduleSyntax":"idle-shorthand"}
+{"time":"2026-08-25T10:16:02.458Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:16:34.167Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:17:06.763Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:17:36.832Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:18:06.896Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:18:37.010Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:19:07.052Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:19:37.137Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:20:07.195Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:20:37.275Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:21:07.373Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:21:37.401Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:21:37.653Z","line":"add","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","label":"default: every idle -> Read C:\\Users\\daniswastaken\\Documents\\project-xena\\AGENTS.md fully and build Project Xena. perfect and expand future and beyond. You're capable of image processing, so for correcting and seeing the results, you can take screenshot of the Desktop on your own then analyze them to build accordingly.","scheduleMode":"idle","scheduleSyntax":"idle-shorthand"}
+{"time":"2026-08-25T10:21:37.923Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":1}
+{"time":"2026-08-25T10:21:38.848Z","line":"deferred","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","reason":"session-busy","source":"idle","retryMs":5000}
+{"time":"2026-08-25T10:21:42.354Z","line":"run","sessionID":"ses_fc7a9d6beffexoGN3hJIC0Qxz7","job":"default","runCount":2}
+{"time":"2026-08-25T10:23:18.534Z","line":"add","sessionID":"ses_fc7912aeaffe7Ej5ndRHnu94Yq","job":"default","label":"default: every idle -> Read C:\\Users\\daniswastaken\\Documents\\project-xena\\AGENTS.md fully and build Project Xena. perfect and expand future and beyond. You're capable of image processing, so for correcting and seeing the results, you can take screenshot of the Desktop on your own then analyze them to build accordingly. If 9Router is down run it on your own. If 9Router is running out of quote, use OpenRouter API key with Ox Alpha model since they're currently in unlimited free state, you can get that OpenRouter API key from this OpenCode config.","scheduleMode":"idle","scheduleSyntax":"idle-shorthand"}
+{"time":"2026-08-25T10:23:18.788Z","line":"deferred","sessionID":"ses_fc7912aeaffe7Ej5ndRHnu94Yq","reason":"session-busy","source":"due","retryMs":5000}
+{"time":"2026-08-25T10:23:19.729Z","line":"deferred","sessionID":"ses_fc7912aeaffe7Ej5ndRHnu94Yq","reason":"session-busy","source":"idle","retryMs":5000}
