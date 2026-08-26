@@ -5,17 +5,29 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export interface Router9Config {
+export interface FallbackProviderConfig {
   baseUrl: string;
   apiKey: string;
   textModel: string;
   visionModel: string;
 }
 
+export interface Router9Config {
+  baseUrl: string;
+  apiKey: string;
+  textModel: string;
+  visionModel: string;
+  /** Optional failover provider (OpenRouter) — active only when its key is set. */
+  fallback: FallbackProviderConfig | null;
+}
+
 const DEFAULTS = {
   baseUrl: "http://localhost:20129/v1",
   textModel: "oc/big-pickle",
   visionModel: "oc/x-preview-f-free",
+  fallbackBaseUrl: "https://openrouter.ai/api/v1",
+  fallbackTextModel: "stealth/ox-alpha",
+  fallbackVisionModel: "minimax/minimax-m3:free",
 } as const;
 
 function readDotEnv(): Record<string, string> {
@@ -50,6 +62,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config 
     apiKey,
     textModel: env.XENA_TEXT_MODEL ?? file.XENA_TEXT_MODEL ?? DEFAULTS.textModel,
     visionModel: env.XENA_VISION_MODEL ?? file.XENA_VISION_MODEL ?? DEFAULTS.visionModel,
+    fallback: buildFallback(env, file),
   };
   return cached;
+}
+
+function buildFallback(env: NodeJS.ProcessEnv, file: Record<string, string>): FallbackProviderConfig | null {
+  const key = env.OPENROUTER_API_KEY ?? file.OPENROUTER_API_KEY ?? "";
+  if (key.trim() === "") return null;
+  return {
+    baseUrl: (
+      env.OPENROUTER_BASE_URL ?? file.OPENROUTER_BASE_URL ?? DEFAULTS.fallbackBaseUrl
+    ).replace(/\/+$/, ""),
+    apiKey: key,
+    textModel: env.XENA_FALLBACK_TEXT_MODEL ?? file.XENA_FALLBACK_TEXT_MODEL ?? DEFAULTS.fallbackTextModel,
+    visionModel: env.XENA_FALLBACK_VISION_MODEL ?? file.XENA_FALLBACK_VISION_MODEL ?? DEFAULTS.fallbackVisionModel,
+  };
 }

@@ -3,7 +3,7 @@
  * Images travel as base64 data URLs in OpenAI `image_url` format.
  */
 import { loadConfig, type Router9Config } from "../config.js";
-import { chatComplete } from "../chat/completions.js";
+import { visionCompleteFailover } from "../chat/failover.js";
 import type { ChatMessage, ImageUrlPart, TextPart } from "../types.js";
 
 export function imageDataUrl(mime: string, base64: string): string {
@@ -21,10 +21,10 @@ export async function askAboutImage(
   dataUrl: string,
   config: Router9Config = loadConfig(),
 ): Promise<string> {
-  const result = await chatComplete(
+  const result = await visionCompleteFailover(
     [buildImageMessage(question, dataUrl)],
-    // Vision upstream is reasoning-style; needs generous token budget.
-    { model: config.visionModel, maxTokens: 600 },
+    // Vision upstreams are reasoning-style; needs generous token budget.
+    { maxTokens: 600 },
     config,
   );
   return result.content;
