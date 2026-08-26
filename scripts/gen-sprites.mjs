@@ -63,6 +63,12 @@ const DIGIT_SEGMENTS = {
   1: [0, 1, 1, 0, 0, 0, 0],
   2: [1, 1, 0, 1, 1, 0, 1],
   3: [1, 1, 1, 1, 0, 0, 1],
+  4: [1, 0, 1, 0, 0, 1, 1],
+  5: [1, 0, 1, 1, 0, 1, 1],
+  6: [1, 0, 1, 1, 1, 1, 1],
+  7: [1, 1, 1, 0, 0, 0, 0],
+  8: [1, 1, 1, 1, 1, 1, 1],
+  9: [1, 1, 1, 1, 0, 1, 1],
 };
 
 function createCanvas(bg) {
@@ -155,17 +161,41 @@ function drawBadge(px, number, bg, fg) {
 
 const WHITE = [255, 255, 255];
 
-function face({ bg, eyes, mouth, number }) {
+/**
+ * Face spec:
+ *   bg       body color
+ *   eyes     open | closed
+ *   eyeR     eye radius (default 40)
+ *   lids     half-lid rects over the eyes (annoyed/sleepy look)
+ *   mouth    closed | open | smile
+ *   number   badge digit
+ */
+function face({ bg, eyes, eyeR = 40, lids = false, mouth, number }) {
   const px = createCanvas(bg);
   if (eyes === "open") {
-    fillCircle(px, 178, 196, 40, WHITE);
-    fillCircle(px, 334, 196, 40, WHITE);
+    fillCircle(px, 178, 196, eyeR, WHITE);
+    fillCircle(px, 334, 196, eyeR, WHITE);
   } else {
     fillRect(px, 138, 188, 80, 16, WHITE);
     fillRect(px, 294, 188, 80, 16, WHITE);
   }
+  if (lids) {
+    const lidColor = bg;
+    fillRect(px, 138, 168, 80, 28 + (eyeR - 40), lidColor);
+    fillRect(px, 294, 168, 80, 28 + (eyeR - 40), lidColor);
+  }
   if (mouth === "open") fillEllipse(px, 256, 348, 74, 48, WHITE);
-  else fillRect(px, 196, 340, 120, 16, WHITE);
+  else if (mouth === "smile") {
+    for (let a = 0; a <= 64; a++) {
+      const t = (a / 64) * Math.PI;
+      fillCircle(px, 256 - 90 * Math.cos(t), 330 + 60 * Math.sin(t), 10, WHITE);
+    }
+  } else if (mouth === "frown") {
+    for (let a = 0; a <= 64; a++) {
+      const t = (a / 64) * Math.PI;
+      fillCircle(px, 256 - 80 * Math.cos(t), 400 - 55 * Math.sin(t), 10, WHITE);
+    }
+  } else fillRect(px, 196, 340, 120, 16, WHITE);
   drawBadge(px, number, bg, WHITE);
   return encodePng(SIZE, SIZE, px);
 }
@@ -179,4 +209,28 @@ const sprites = [
 for (const [name, spec] of sprites) {
   writeFileSync(join(outDir, name), face(spec));
   console.log("wrote", name);
+}
+
+// Emotion set (mood tags from the model drive these).
+// Each emotion gets an idle and a talk variant; blink falls back to neutral.
+const EMOTION_DIR = join(outDir, "emotions");
+mkdirSync(EMOTION_DIR, { recursive: true });
+const emotionSprites = [
+  //                file                    bg                        eyes     eyeR lids   mouth
+  ["happy-idle.png", { bg: [243, 156, 18], eyes: "open", mouth: "smile", number: 4 }],
+  ["happy-talk.png", { bg: [243, 156, 18], eyes: "open", mouth: "open", number: 4 }],
+  ["smug-idle.png", { bg: [142, 68, 173], eyes: "open", eyeR: 30, mouth: "smile", number: 5 }],
+  ["smug-talk.png", { bg: [142, 68, 173], eyes: "open", eyeR: 30, mouth: "open", number: 5 }],
+  ["surprised-idle.png", { bg: [231, 76, 60], eyes: "open", eyeR: 52, mouth: "open", number: 6 }],
+  ["surprised-talk.png", { bg: [231, 76, 60], eyes: "open", eyeR: 52, mouth: "open", number: 6 }],
+  ["annoyed-idle.png", { bg: [127, 140, 141], eyes: "open", lids: true, mouth: "closed", number: 7 }],
+  ["annoyed-talk.png", { bg: [127, 140, 141], eyes: "open", lids: true, mouth: "open", number: 7 }],
+  ["sleepy-idle.png", { bg: [52, 73, 94], eyes: "closed", mouth: "closed", number: 8 }],
+  ["sleepy-talk.png", { bg: [52, 73, 94], eyes: "closed", lids: false, mouth: "open", number: 8 }],
+  ["sad-idle.png", { bg: [22, 105, 122], eyes: "open", lids: true, mouth: "frown", number: 9 }],
+  ["sad-talk.png", { bg: [22, 105, 122], eyes: "open", lids: true, mouth: "open", number: 9 }],
+];
+for (const [name, spec] of emotionSprites) {
+  writeFileSync(join(EMOTION_DIR, name), face(spec));
+  console.log("wrote emotions/" + name);
 }

@@ -1,0 +1,88 @@
+:root {
+  --xena-accent: #2e86de;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+#pointer-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#pointer-root.hidden {
+  display: none;
+}
+
+.ring {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid var(--xena-accent);
+  animation: ring-pulse 1.1s ease-out infinite;
+}
+
+.core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--xena-accent);
+  box-shadow: 0 0 12px var(--xena-accent);
+}
+
+/* "click here" affordance: core does a quick double-tap pulse on arrival */
+#pointer-root.arriving .core {
+  animation: core-click 0.7s ease-in-out 1;
+}
+
+@keyframes core-click {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.9); }
+  50% { transform: scale(0.8); }
+  75% { transform: scale(1.5); }
+}
+
+.label {
+  position: absolute;
+  top: 58px;
+  max-width: 220px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(16, 20, 28, 0.78);
+  color: #fff;
+  font: 11px/1.4 "Segoe UI", sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label.hidden {
+  display: none;
+}
+
+@keyframes ring-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
