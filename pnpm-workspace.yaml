@@ -2,6 +2,14 @@ packages:
   - "apps/*"
   - "packages/*"
 
+overrides:
+  "@pixi/core": 6.5.10
+  "@pixi/display": 6.5.10
+  "@pixi/loaders": 6.5.10
+  "@pixi/math": 6.5.10
+  "@pixi/sprite": 6.5.10
+  "@pixi/utils": 6.5.10
+
 onlyBuiltDependencies:
   - esbuild
   - electron

@@ -4,9 +4,10 @@
  * one comment per cooldown, never while a chat reply is streaming.
  * Comments are one-shot completions and are NOT persisted to the transcript.
  */
-import { chatComplete, type Router9Config } from "@xena/router9-client";
-import { buildSystemPrompt } from "@xena/xena-core";
+import { chatCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { buildSystemPrompt, extractEmotion } from "@xena/xena-core";
 import type { SettingsStore } from "../settings/store.js";
+import { CHANNELS } from "../ipc/channels.js";
 
 // Env overrides exist for dev verification only; production uses the long defaults.
 const CHECK_INTERVAL_MS = Number(process.env.XENA_TEST_CHECK_MS) || 5 * 60_000;
@@ -20,6 +21,14 @@ const IDLE_PROMPTS = [
   "Long silence. Offer ONE short thought or gentle check-in (max 12 words).",
 ];
 
+function timeOfDay(hour: number): string {
+  if (hour < 8) return "late night";
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  if (hour < 21) return "evening";
+  return "night";
+}
+
 export class ProactiveScheduler {
   private timer: NodeJS.Timeout | null = null;
   private lastInteractionAt = Date.now();
@@ -31,7 +40,9 @@ export class ProactiveScheduler {
     private readonly getWindow: () => Electron.BrowserWindow,
     private readonly settings: SettingsStore,
     private readonly config: Router9Config,
-    private readonly onSpeak: (text: string) => Promise<void>,
+    private readonly onSpeak: (text: string, mood?: string) => Promise<void>,
+    /** Optional: relevant memory fragments to flavor the idle comment. */
+    private readonly memoryContext?: () => Promise<string>,
   ) {}
 
   start(): void {
@@ -52,6 +63,15 @@ export class ProactiveScheduler {
     this.busy = busy;
   }
 
+  isBusy(): boolean {
+    return this.busy;
+  }
+
+  /** Milliseconds since the last user interaction. */
+  timeSinceInteractionMs(): number {
+    return Date.now() - this.lastInteractionAt;
+  }
+
   private async tick(): Promise<void> {
     if (this.busy) return;
     const { proactiveEnabled } = await this.settings.get();
@@ -65,20 +85,31 @@ export class ProactiveScheduler {
     this.lastCommentAt = Date.now();
     const prompt = IDLE_PROMPTS[this.promptRotation % IDLE_PROMPTS.length] as string;
     this.promptRotation++;
+    let memory = "";
     try {
-      const result = await chatComplete(
+      memory = (await this.memoryContext?.()) ?? "";
+    } catch {
+      memory = "";
+    }
+    try {
+      const result = await chatCompleteFailover(
         [
           { role: "system", content: buildSystemPrompt() },
-          { role: "user", content: prompt },
+          ...(memory ? [{ role: "system" as const, content: memory }] : []),
+          {
+            role: "user" as const,
+            content: `It is ${timeOfDay(now.getHours())} right now. ${prompt}`,
+          },
         ],
         // Reasoning upstream needs headroom or the visible answer truncates.
         { model: this.config.textModel, maxTokens: 500, temperature: 1.0 },
         this.config,
       );
-      const comment = result.content.trim();
-      if (comment === "") return;
-      this.getWindow().webContents.send("chat:proactive", comment);
-      await this.onSpeak(comment);
+      const { clean, emotion } = extractEmotion(result.content.trim());
+      if (clean === "") return;
+      this.getWindow().webContents.send("chat:proactive", clean);
+      this.getWindow().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
+      await this.onSpeak(clean, emotion ?? undefined);
     } catch {
       // Proactive comments are best-effort; stay silent on failure.
     }

@@ -1,6 +1,6 @@
 {
   "name": "@xena/stage-xena",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "commonjs",
   "description": "Xena desktop overlay app (Electron)",
@@ -12,9 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pixi/unsafe-eval": "^6.5.10",
     "@xena/router9-client": "workspace:*",
     "@xena/tts": "workspace:*",
-    "@xena/xena-core": "workspace:*"
+    "@xena/xena-core": "workspace:*",
+    "pixi-live2d-display": "^0.4.0",
+    "pixi.js": "^6.5.10"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
@@ -23,3 +26,4 @@
     "typescript": "^5.9.2"
   }
 }
+

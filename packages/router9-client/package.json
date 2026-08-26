@@ -1,6 +1,6 @@
 {
   "name": "@xena/router9-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "All 9Router API code for Project Xena — chat, vision, models",
@@ -18,3 +18,4 @@
     "typescript": "^5.9.2"
   }
 }
+
