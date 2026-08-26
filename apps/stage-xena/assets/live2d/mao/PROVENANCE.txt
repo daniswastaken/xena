@@ -1,0 +1,1 @@
+Mao - Live2D official sample model (Cubism 4). Source: github.com/Live2D/CubismWebSamples (Samples/Resources/Mao). Provided under Live2D's Free Material License. Downloaded 2026-08-26.

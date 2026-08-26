@@ -1,11 +1,10 @@
 /**
- * CDP driver: opens Xena chat panel and sends a message through the real UI.
- * Usage: node scripts/drive-xena.mjs "message"
+ * Reads the summon-bar answer text + busy dot state via CDP.
+ * Usage: node scripts/inspect-bar.mjs
  */
-const message = process.argv[2] ?? "Say hi in five words";
 const targets = await (await fetch("http://127.0.0.1:9223/json")).json();
-const page = targets.find((t) => t.webSocketDebuggerUrl && t.title === "Xena");
-if (!page) throw new Error("Xena page target not found");
+const page = targets.find((t) => t.webSocketDebuggerUrl && t.title === "Xena Bar");
+if (!page) throw new Error("Xena Bar target not found");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((res, rej) => {
   ws.onopen = res;
@@ -26,15 +25,15 @@ const call = (method, params) =>
     ws.addEventListener("message", onMsg);
     ws.send(JSON.stringify({ id: mid, method, params }));
   });
+
 await call("Runtime.enable");
-const expr = `
-  (() => {
-    const stage = document.getElementById('avatar-stage');
-    if (stage) stage.click();
-    window.xena.sendChat(${JSON.stringify(message)});
-    return 'sent';
-  })()
-`;
-const result = await call("Runtime.evaluate", { expression: expr, awaitPromise: false });
-console.log("evaluate:", result.result.value ?? JSON.stringify(result.result));
+const r = await call("Runtime.evaluate", {
+  expression: `(() => {
+    const answer = document.getElementById('answer');
+    const barWrap = document.getElementById('bar-wrap');
+    return JSON.stringify({ text: answer ? answer.textContent : null, hidden: barWrap ? barWrap.classList.contains('hidden') : null });
+  })()`,
+  returnByValue: true,
+});
+console.log(r.result?.value ?? JSON.stringify(r.result));
 ws.close();

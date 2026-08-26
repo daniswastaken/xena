@@ -1,15 +1,22 @@
 /**
- * Conversation session: assembles system prompt + trimmed history,
- * streams completions, persists the transcript.
+ * Conversation session: assembles system prompt + recalled memory +
+ * trimmed history, streams completions with provider failover,
+ * persists the transcript.
  */
-import { streamChat } from "@xena/router9-client";
+import { streamChatFailover } from "@xena/router9-client";
 import type { ChatMessage, Router9Config } from "@xena/router9-client";
 import { buildSystemPrompt } from "../persona/prompt.js";
 import { MemoryStore, type StoredTranscript } from "../memory/store.js";
+import { MemoryRecall, renderRecallContext } from "../memory/recall.js";
+import { FactsStore } from "../memory/facts.js";
 
 export interface SessionEvents {
   onToken?: (fullText: string) => void;
   onError?: (error: Error) => void;
+  /** Fires once per successful reply with the provider that served it. */
+  onProvider?: (provider: string) => void;
+  /** Reasoning-model deltas before content starts (thinking indicator). */
+  onReasoning?: (delta: string) => void;
 }
 
 export interface SessionOptions {
@@ -20,6 +27,10 @@ export interface SessionOptions {
   historyLimit?: number;
   /** override the text model from config */
   model?: string;
+  /** when set, recall also scores nightly diary entries */
+  diaryDir?: string;
+  /** when set, /remember facts are injected authoritatively */
+  factsPath?: string;
 }
 
 const DEFAULT_HISTORY_LIMIT = 24;
@@ -27,18 +38,24 @@ const DEFAULT_HISTORY_LIMIT = 24;
 export class Session {
   readonly id: string;
   private messages: ChatMessage[] = [];
-  private readonly system: ChatMessage;
+  private readonly baseSystem: string;
   private readonly store: MemoryStore;
+  private readonly recall: MemoryRecall;
+  private readonly facts: FactsStore | null;
   private readonly historyLimit: number;
-  private readonly model: string;
+  private readonly model: string | undefined;
+  private readonly config: Router9Config;
   private controller: AbortController | null = null;
 
   constructor(options: SessionOptions, config: Router9Config) {
     this.id = options.sessionId;
+    this.config = config;
     this.store = new MemoryStore(options.storeDir);
+    this.recall = new MemoryRecall(this.store, options.diaryDir);
+    this.facts = options.factsPath ? new FactsStore(options.factsPath) : null;
     this.historyLimit = options.historyLimit ?? DEFAULT_HISTORY_LIMIT;
     this.model = options.model ?? config.textModel;
-    this.system = { role: "system", content: buildSystemPrompt() };
+    this.baseSystem = buildSystemPrompt();
   }
 
   static async open(
@@ -46,8 +63,7 @@ export class Session {
     config: Router9Config,
   ): Promise<{ session: Session; transcript: StoredTranscript | null }> {
     const session = new Session(options, config);
-    const store = new MemoryStore(options.storeDir);
-    const transcript = await store.load(session.id);
+    const transcript = await session.store.load(session.id);
     if (transcript) session.messages = transcript.messages;
     return { session, transcript };
   }
@@ -64,23 +80,31 @@ export class Session {
 
   async send(userText: string, events: SessionEvents = {}): Promise<string> {
     await this.append({ role: "user", content: userText });
-    const payload = [this.system, ...this.trimmedHistory()];
-    let full = "";
+    const system = await this.assembledSystemPrompt(userText);
+    const payload = [system, ...this.trimmedHistory()];
+    let accumulated = "";
     this.controller = new AbortController();
     try {
-      full = await streamChat(
+      const { full, providerUsed } = await streamChatFailover(
         payload,
-        { model: this.model, maxTokens: 700, signal: this.controller.signal },
-        (delta) => {
-          full += delta;
-          events.onToken?.(full);
+        {
+          model: this.model,
+          maxTokens: 700,
+          signal: this.controller.signal,
+          onReasoning: (delta) => events.onReasoning?.(delta),
         },
+        (delta) => {
+          accumulated += delta;
+          events.onToken?.(accumulated);
+        },
+        this.config,
       );
+      events.onProvider?.(providerUsed);
       await this.append({ role: "assistant", content: full });
       return full;
     } catch (error) {
       events.onError?.(error instanceof Error ? error : new Error(String(error)));
-      return full;
+      return accumulated;
     } finally {
       this.controller = null;
     }
@@ -95,6 +119,26 @@ export class Session {
     this.abort();
     this.messages = [];
     await this.persist();
+  }
+
+  /**
+   * System prompt enriched with relevant fragments of past conversations.
+   * Recall failure must never break the chat.
+   */
+  private async assembledSystemPrompt(userText: string): Promise<ChatMessage> {
+    let content = this.baseSystem;
+    try {
+      if (this.facts) {
+        const factsBlock = await this.facts.renderPromptBlock();
+        if (factsBlock) content += `\n\n${factsBlock}`;
+      }
+      const hits = await this.recall.recall(userText, { excludeSessionId: this.id });
+      const block = renderRecallContext(hits);
+      if (block) content += `\n\n${block}`;
+    } catch {
+      // no recall — plain prompt
+    }
+    return { role: "system", content };
   }
 
   private trimmedHistory(): ChatMessage[] {
