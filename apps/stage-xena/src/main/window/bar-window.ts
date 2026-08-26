@@ -1,6 +1,9 @@
 /**
  * Bar window: small transparent summon-bar surface. Lives independently
  * from the avatar window so shake-summon moves ONLY the bar.
+ *
+ * Multi-monitor: the bar follows the cursor to whichever display the
+ * user is currently on, clamping within that display's work area.
  */
 import { app, BrowserWindow, screen } from "electron";
 import { execFile } from "node:child_process";
@@ -11,18 +14,24 @@ export const BAR_WIDTH = 380;
 export const BAR_IDLE_HEIGHT = 72;
 export const BAR_MAX_HEIGHT = 400;
 
+/** Return the Display nearest to the given point. */
+function displayAt(x: number, y: number): Electron.Display {
+  return screen.getDisplayNearestPoint({ x, y });
+}
+
 export class BarWindow {
   readonly win: BrowserWindow;
   private home = { x: 0, y: 0 };
+  private homeDisplayId: number = -1;
   private away = false;
   private shownAt = 0;
 
-  constructor(avatarHome: { x: number; y: number }) {
+  constructor(private readonly onCornerSummon?: () => void) {
+    // Initial home on primary (will be recalculated on each summon).
     const { workArea } = screen.getPrimaryDisplay();
-    // Bar bottom sits just above the avatar's head.
     this.home = {
-      x: avatarHome.x - (BAR_WIDTH - 188) + 8,
-      y: avatarHome.y - BAR_IDLE_HEIGHT - 8,
+      x: workArea.x + 12,
+      y: workArea.y + workArea.height - BAR_IDLE_HEIGHT - 12,
     };
     this.win = new BrowserWindow({
       width: BAR_WIDTH,
@@ -69,18 +78,41 @@ export class BarWindow {
     });
   }
 
-  /** Bar above the avatar. */
+  /** Recalculate home position for the display under the cursor. */
+  private updateHome(display: Electron.Display): void {
+    const { workArea } = display;
+    this.home = {
+      x: workArea.x + 12,
+      y: workArea.y + workArea.height - BAR_IDLE_HEIGHT - 12,
+    };
+    this.homeDisplayId = display.id;
+  }
+
+  /** Bar in the bottom-left of whichever display the cursor is on. */
   summonCorner(): void {
     if (this.away) this.restoreIdleSize();
+    // Find the display under the cursor; fall back to primary if cursor
+    // position isn't available (e.g. summoned via tray with no cursor info).
+    const cursor = screen.getCursorScreenPoint();
+    const display = displayAt(cursor.x, cursor.y);
+    this.updateHome(display);
     this.win.setPosition(this.home.x, this.home.y, false);
     this.away = false;
     this.show();
+    // Presence hook: main may greet the user back after a long absence.
+    try {
+      this.onCornerSummon?.();
+    } catch {
+      // greeting is best-effort
+    }
   }
 
-  /** Bar centered on the cursor: bar center == cursor point. */
+  /** Bar centered on the cursor: bar center == cursor point.
+   *  Clamps to whichever display the cursor is currently on. */
   summonAtCursor(x: number, y: number): void {
     if (this.away) this.restoreIdleSize();
-    const { workArea } = screen.getPrimaryDisplay();
+    const display = displayAt(x, y);
+    const { workArea } = display;
     const wx = Math.round(
       Math.max(workArea.x + 4, Math.min(x - BAR_WIDTH / 2, workArea.x + workArea.width - BAR_WIDTH - 4)),
     );

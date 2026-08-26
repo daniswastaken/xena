@@ -4,9 +4,10 @@
  */
 import { BrowserWindow, screen } from "electron";
 import { join } from "node:path";
+import { CHANNELS } from "../ipc/channels.js";
 
-export const WINDOW_WIDTH = 188;
-export const WINDOW_HEIGHT = 188;
+export const WINDOW_WIDTH = 460;
+export const WINDOW_HEIGHT = 400;
 export const AVATAR_MARGIN = 0;
 
 export interface AvatarHome {
@@ -46,7 +47,20 @@ export function createAvatarWindow(): { win: BrowserWindow; home: AvatarHome } {
   win.setAlwaysOnTop(true, "screen-saver");
   win.loadFile(join(__dirname, "../renderer/index.html"));
   win.once("ready-to-show", () => win.showInactive());
-  // Fully click-through, forever — the avatar is decoration.
-  win.setIgnoreMouseEvents(true);
+  // Click-through by default; the bubble surface flips interactivity
+  // on hover (scroll/select/copy) via the renderer.
+  win.setIgnoreMouseEvents(true, { forward: true });
+  void win.webContents.ipc.on(CHANNELS.setClickThrough, (_e, interactive: unknown) => {
+    if (typeof interactive === "boolean") {
+      win.setIgnoreMouseEvents(!interactive, { forward: true });
+    }
+  });
+  // Always-on companion: a crashed renderer comes back on its own.
+  win.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit") return;
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.webContents.reload();
+    }, 1500);
+  });
   return { win, home };
 }

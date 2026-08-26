@@ -2,14 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; media-src 'self' data:" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; media-src 'self' data:; script-src 'self'" />
     <title>Xena</title>
     <link rel="stylesheet" href="./styles/main.css" />
+    <link rel="stylesheet" href="./styles/bubble.css" />
   </head>
   <body>
     <div id="xena-root">
+      <div id="bubble" class="hidden">
+        <div id="bubble-reason" class="hidden"></div>
+        <div id="bubble-name" class="hidden">Xena</div>
+        <div id="bubble-text"></div>
+        <div id="bubble-provider" class="hidden"></div>
+        <button id="bubble-copy" class="hidden" title="Copy reply">copy</button>
+        <div id="bubble-tail"></div>
+      </div>
+      <div id="live2d-root"></div>
       <img id="avatar" src="./assets/idle.png" alt="Xena" draggable="false" />
     </div>
+    <script src="./assets/vendor/live2dcubismcore.min.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>

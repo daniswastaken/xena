@@ -55,9 +55,19 @@ await esbuild.build({
   format: "iife",
 });
 
+await esbuild.build({
+  ...common,
+  entryPoints: [join(root, "src/renderer/bar.ts")],
+  outfile: join(dist, "renderer/bar.js"),
+  platform: "browser",
+  format: "iife",
+});
+
 cpSync(join(root, "src/renderer/index.html"), join(dist, "renderer/index.html"));
 cpSync(join(root, "src/renderer/bar.html"), join(dist, "renderer/bar.html"));
+cpSync(join(root, "src/renderer/pointer.html"), join(dist, "renderer/pointer.html"));
 cpSync(join(root, "src/renderer/styles"), join(dist, "renderer/styles"), { recursive: true });
 cpSync(join(root, "assets"), join(dist, "renderer/assets"), { recursive: true });
 
 console.log("build ok ->", dist);
+

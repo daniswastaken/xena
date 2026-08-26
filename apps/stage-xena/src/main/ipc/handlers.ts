@@ -2,19 +2,40 @@
  * IPC handlers: chat streaming relay, vision ask, TTS relay.
  * Renderer never fetches directly — everything goes through here.
  */
-import { ipcMain } from "electron";
+import { ipcMain, Notification } from "electron";
+import { screen } from "electron";
+import { access, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Session } from "@xena/xena-core";
 import { MemoryStore } from "@xena/xena-core";
-import { askAboutImage, type Router9Config } from "@xena/router9-client";
+import { Diary } from "@xena/xena-core";
+import { FactsStore } from "@xena/xena-core";
+import { extractEmotion, extractPointTargets, extractFactTags, buildSystemPrompt } from "@xena/xena-core";
+import { askAboutImage, chatCompleteFailover, type Router9Config } from "@xena/router9-client";
 import { CHANNELS } from "./channels.js";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
+import { locateOnScreen } from "../pointer/locate.js";
+import { transcribeAudio } from "../voice-input/transcribe.js";
+import type { PointerWindow } from "../window/pointer-window.js";
 import { speakReply } from "../tts/speak.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { ProactiveScheduler } from "../proactive/scheduler.js";
 import type { BarWindow } from "../window/bar-window.js";
-import { join } from "node:path";
 
 const DATA_DIR = join(process.cwd(), "data");
+
+/** Fresh-screen cache: follow-up /look questions reuse the last capture. */
+const CAPTURE_TTL_MS = 60_000;
+let lastCapture: { dataUrl: string; at: number } | null = null;
+
+async function getScreenCapture(): Promise<string> {
+  if (lastCapture && Date.now() - lastCapture.at < CAPTURE_TTL_MS) {
+    return lastCapture.dataUrl;
+  }
+  const dataUrl = await captureScreenDataUrl();
+  lastCapture = { dataUrl, at: Date.now() };
+  return dataUrl;
+}
 
 /** One session per calendar day — history rotates daily. */
 function todaySessionId(): string {
@@ -27,6 +48,8 @@ export function registerIpcHandlers(
   scheduler: ProactiveScheduler,
   bar: BarWindow,
   avatarWin: () => Electron.BrowserWindow,
+  pointer?: PointerWindow,
+  gaze?: { lookAtPoint: (x: number, y: number, holdMs?: number) => void },
 ): void {
   let currentSessionId = todaySessionId();
   let currentModel = "";
@@ -35,7 +58,13 @@ export function registerIpcHandlers(
     return settings.get().then(({ textModel }) => {
       currentModel = textModel;
       return Session.open(
-        { sessionId: currentSessionId, storeDir: DATA_DIR, model: textModel || undefined },
+        {
+          sessionId: currentSessionId,
+          storeDir: DATA_DIR,
+          model: textModel || undefined,
+          diaryDir: join(DATA_DIR, "diary"),
+          factsPath: join(DATA_DIR, "facts.json"),
+        },
         config,
       ).then((r) => r.session);
     });
@@ -44,8 +73,13 @@ export function registerIpcHandlers(
   /** Reopens the session when the calendar day or model changed. */
   async function getSession(): Promise<Session> {
     if (currentSessionId !== todaySessionId()) {
+      const previous = currentSessionId;
       currentSessionId = todaySessionId();
       sessionReady = openSession();
+      // Nightly diary for yesterday's transcript — fire and forget.
+      void new Diary(new MemoryStore(DATA_DIR), join(DATA_DIR, "diary"))
+        .writeForSession(previous, config)
+        .catch(() => undefined);
     }
     return sessionReady;
   }
@@ -55,29 +89,172 @@ export function registerIpcHandlers(
   // Hygiene: drop transcripts older than 30 days, fire-and-forget.
   void new MemoryStore(DATA_DIR).pruneOlderThan(30).catch(() => undefined);
 
-  async function maybeSpeak(text: string): Promise<void> {
-    const { voiceEnabled } = await settings.get();
+  /** One-time friendly intro when Xena has never met this user. */
+  async function maybeFirstRunGreeting(): Promise<void> {
+    try {
+      const store = new MemoryStore(DATA_DIR);
+      if ((await store.listAll()).length > 0) return;
+      const greeted = join(DATA_DIR, ".greeted");
+      try {
+        await access(greeted);
+        return;
+      } catch {
+        /* not greeted yet */
+      }
+      await writeFile(greeted, new Date().toISOString(), "utf8");
+      const result = await chatCompleteFailover(
+        [
+          { role: "system", content: buildSystemPrompt() },
+          {
+            role: "user",
+            content:
+              "This is the very first time we meet. Say ONE short friendly intro (max 12 words) — you just moved into the corner of my screen.",
+          },
+        ],
+        { maxTokens: 300, temperature: 1.0 },
+        config,
+      );
+      const { clean, emotion } = extractEmotion(result.content.trim());
+      if (clean === "") return;
+      avatarWin().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
+            avatarWin().webContents.send(CHANNELS.chatProactive, clean);
+      await maybeSpeak(clean);
+    } catch {
+      // greeting is best-effort
+    }
+  }
+  setTimeout(() => void maybeFirstRunGreeting(), 90_000);
+
+  async function maybeSpeak(text: string, mood?: string): Promise<void> {
+    const { voiceEnabled, ttsVoice } = await settings.get();
     if (!voiceEnabled || text.trim() === "") return;
     try {
-      const audio = await speakReply(text);
+      const audio = await speakReply(text, ttsVoice || undefined, mood);
       avatarWin().webContents.send(CHANNELS.ttsAudio, audio);
     } catch {
       // Voice is best-effort — never break chat over TTS failure.
     }
   }
 
+  let lastFailToastAt = 0;
+
+  function notifyBrainDown(message: string): void {
+    // Only when every provider failed; throttle to one toast per 5 minutes.
+    if (Date.now() - lastFailToastAt < 5 * 60_000) return;
+    lastFailToastAt = Date.now();
+    try {
+      new Notification({
+        title: "Xena can't reach her brain",
+        body: message.slice(0, 160),
+        silent: true,
+      }).show();
+    } catch {
+      // notifications are best-effort
+    }
+  }
+
   ipcMain.handle(CHANNELS.chatSend, async (_event, text: unknown) => {
     if (typeof text !== "string" || text.trim() === "") throw new Error("empty message");
+    const trimmed = text.trim();
     scheduler.noteActivity();
+    // Instant perk-up when her name is spoken — no waiting on the model.
+    if (/\bxena\b/i.test(trimmed)) {
+      avatarWin().webContents.send(CHANNELS.avatarEmote, "happy");
+    }
+    // Command interception for non-bar entry paths (hotkey/CDP sendChat).
+    if (trimmed.startsWith("/remember ")) {
+      const confirmation = await handleRemember(trimmed.slice(10));
+      avatarWin().webContents.send(CHANNELS.chatToken, confirmation);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+      return;
+    }
+    if (trimmed.startsWith("/forget ")) {
+      const confirmation = await handleForget(trimmed.slice(8));
+      avatarWin().webContents.send(CHANNELS.chatToken, confirmation);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+      return;
+    }
+    if (trimmed === "/help") {
+      avatarWin().webContents.send(CHANNELS.chatToken, HELP_TEXT);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+      return;
+    }
+    if (trimmed === "/stats") {      const session = await getSession();
+      const msgs = session.history().filter((m) => m.role !== "system").length;
+      const facts = await new FactsStore(join(DATA_DIR, "facts.json")).listAll();
+      const diaries = (await new Diary(new MemoryStore(DATA_DIR), join(DATA_DIR, "diary")).listAll()).length;
+      bar.win.webContents.send(
+        CHANNELS.chatToken,
+        `Today: ${msgs} messages. Long-term: ${facts.length} fact${facts.length === 1 ? "" : "s"}, ${diaries} diary entr${diaries === 1 ? "y" : "ies"}.`,
+      );
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+      return;
+    }
+    const wasBusyAtSubmit = scheduler.isBusy();
     scheduler.setBusy(true);
+    let thinkingShown = false;
+    // Loading indicator lives in the bubble from submit until the first
+    // token — the bar is dismissed on Enter, so the dots ARE the feedback.
+    if (!wasBusyAtSubmit) {
+      thinkingShown = true;
+      avatarWin().webContents.send(CHANNELS.chatThinking, true);
+    }
     try {
       const session = await getSession();
       const reply = await session.send(text.trim(), {
-        onToken: (full) => bar.win.webContents.send(CHANNELS.chatToken, full),
-        onError: (error) => bar.win.webContents.send(CHANNELS.chatError, error.message),
+        onToken: (full) => {
+                      if (thinkingShown) {
+            thinkingShown = false;
+            avatarWin().webContents.send(CHANNELS.chatThinking, false);
+          }
+          avatarWin().webContents.send(CHANNELS.chatToken, full);
+        },
+        onError: (error) => {
+          avatarWin().webContents.send(CHANNELS.chatError, error.message);
+          notifyBrainDown(error.message);
+        },
+        onReasoning: () => {
+          if (!thinkingShown) {
+            thinkingShown = true;
+            avatarWin().webContents.send(CHANNELS.chatThinking, true);
+          }
+        },
+        onProvider: (provider) => {
+          // Always send: empty clears a stale fallback badge on recovery.
+          avatarWin().webContents.send(CHANNELS.chatProvider, provider === "router9" ? "" : provider);
+        },
       });
-      bar.win.webContents.send(CHANNELS.chatDone, true);
-      await maybeSpeak(reply);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+      // Reading time scales with the answer: 8s base + 20ms/char (max +20s).
+      const { clean, emotion } = extractEmotion(reply);
+      const { clean: afterPoints, targets } = extractPointTargets(clean);
+      const { clean: speakable, facts } = extractFactTags(afterPoints);
+      avatarWin().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
+      // Model-curated memory: [fact: ...] tags persist to the facts store.
+      if (facts.length > 0) {
+        const factsStore = new FactsStore(join(DATA_DIR, "facts.json"));
+        void Promise.all(facts.slice(0, 2).map((f) => factsStore.add(f))).catch(() => undefined);
+      }
+      // Natural-language pointing: [point: target] tags fire the AI Pointer
+      // in sequence after the reply lands; locate failures stay silent.
+      // Mao glances at whatever she points at.
+      if (targets.length > 0 && pointer) {
+        const { bounds } = screen.getPrimaryDisplay();
+        targets.slice(0, 3).forEach((target, step) => {
+          setTimeout(() => {
+            void locateOnScreen(target, config)
+              .then((coords) => {
+                if (!coords) return;
+                const px = bounds.x + coords.x * bounds.width;
+                const py = bounds.y + coords.y * bounds.height;
+                pointer!.pointAt(px, py, target);
+                gaze?.lookAtPoint(px, py);
+              })
+              .catch(() => undefined);
+          }, step * 4500);
+        });
+      }
+      await maybeSpeak(speakable, emotion ?? undefined);
     } finally {
       scheduler.setBusy(false);
     }
@@ -93,6 +270,63 @@ export function registerIpcHandlers(
     await session.reset();
   });
 
+  async function handleRemember(fact: string): Promise<string> {
+    await new FactsStore(join(DATA_DIR, "facts.json")).add(fact.slice(0, 500));
+    return `Noted — I'll remember that.`;
+  }
+
+  async function handleForget(keyword: string): Promise<string> {
+    const path = join(DATA_DIR, "facts.json");
+    const store = new FactsStore(path);
+    const all = await store.listAll();
+    const needle = keyword.trim().toLowerCase();
+    const kept = all.filter((f) => !f.text.toLowerCase().includes(needle));
+    const removed = all.length - kept.length;
+    if (removed === 0) return `Nothing in my facts matches "${keyword.trim()}".`;
+    await store.rewrite(kept);
+    return `Forgot ${removed} fact${removed === 1 ? "" : "s"} matching "${keyword.trim()}".`;
+  }
+
+  const HELP_TEXT = [
+    "Commands:",
+    "/look <question> — share your screen and ask about it",
+    "/remember <fact> — I'll keep this permanently",
+    "/forget <keyword> — drop matching facts",
+    "/clear — wipe today's conversation",
+    "/help — this list",
+  ].join("\n");
+
+  ipcMain.handle(CHANNELS.remember, async (_event, text: unknown) => {
+    if (typeof text !== "string" || text.trim() === "") throw new Error("empty fact");
+    return handleRemember(text.trim());
+  });
+
+  ipcMain.handle(CHANNELS.forget, async (_event, text: unknown) => {
+    if (typeof text !== "string" || text.trim() === "") throw new Error("empty keyword");
+    return handleForget(text.trim());
+  });
+
+  ipcMain.handle(CHANNELS.live2dGet, async () => {
+    const { live2dEnabled, live2dModel } = await settings.get();
+    return { enabled: live2dEnabled, model: live2dModel || "hiyori" };
+  });
+
+  ipcMain.handle(CHANNELS.voiceTranscribe, async (_event, audio: unknown) => {
+    if (typeof audio !== "string" || audio.length < 100) throw new Error("no audio");
+    scheduler.noteActivity();
+    const text = await transcribeAudio(audio, config);
+    if (text === "") throw new Error("empty transcription");
+    return text;
+  });
+
+  ipcMain.handle(CHANNELS.getStats, async () => {
+    const session = await getSession();
+    const msgs = session.history().filter((m) => m.role !== "system").length;
+    const facts = await new FactsStore(join(DATA_DIR, "facts.json")).listAll();
+    const diaries = (await new Diary(new MemoryStore(DATA_DIR), join(DATA_DIR, "diary")).listAll()).length;
+    return `Today: ${msgs} messages. Long-term: ${facts.length} fact${facts.length === 1 ? "" : "s"}, ${diaries} diary entr${diaries === 1 ? "y" : "ies"}.`;
+  });
+
   ipcMain.on(CHANNELS.noteActivity, () => {
     scheduler.noteActivity();
   });
@@ -101,15 +335,75 @@ export function registerIpcHandlers(
     bar.hide();
   });
 
+  ipcMain.handle(CHANNELS.pointAt, async (_event, target: unknown) => {
+    if (typeof target !== "string" || target.trim() === "") throw new Error("empty target");
+    const wanted = target.trim();
+    scheduler.noteActivity();
+    // Bubble dots while the vision model locates — unless a stream owns it.
+    const free = !scheduler.isBusy();
+    if (free) avatarWin().webContents.send(CHANNELS.chatThinking, true);
+    const coords = await locateOnScreen(wanted, config);
+    if (!coords) {
+      if (free) {
+        avatarWin().webContents.send(CHANNELS.chatThinking, false);
+        avatarWin().webContents.send(CHANNELS.chatToken, `I looked but couldn't find "${wanted}" on your screen.`);
+        avatarWin().webContents.send(CHANNELS.chatDone, true);
+      }
+      return `I looked but couldn't find "${wanted}" on your screen.`;
+    }
+    if (pointer) {
+      // Capture covers the FULL display (incl. taskbar) — map with bounds,
+      // not workArea, or points land clipped above the taskbar.
+      const { bounds } = screen.getPrimaryDisplay();
+      const px = bounds.x + coords.x * bounds.width;
+      const py = bounds.y + coords.y * bounds.height;
+      pointer.pointAt(px, py, wanted);
+      gaze?.lookAtPoint(px, py);
+    }
+    const reply = `Right here — I'm pointing at ${wanted}.`;
+    // Mid-stream, the chat window is busy with the real reply — pointer
+    // still fires, but we don't clobber the stream or the busy state.
+    if (!scheduler.isBusy()) {
+            avatarWin().webContents.send(CHANNELS.chatToken, reply);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+    }
+    return reply;
+  });
+
   ipcMain.handle(CHANNELS.visionAsk, async (_event, question: unknown) => {
     const q =
       typeof question === "string" && question.trim() !== ""
         ? question.trim()
         : "What am I looking at?";
     scheduler.noteActivity();
-    const dataUrl = await captureScreenDataUrl();
-    const answer = await askAboutImage(q, dataUrl, config);
-    await maybeSpeak(answer);
+    const free = !scheduler.isBusy();
+    if (free) avatarWin().webContents.send(CHANNELS.chatThinking, true);
+    const dataUrl = await getScreenCapture();
+    let answer: string;
+    try {
+      answer = await askAboutImage(q, dataUrl, config);
+    } catch (err) {
+      if (free) avatarWin().webContents.send(CHANNELS.chatThinking, false);
+      throw err;
+    }
+    // Vision Q&A joins the transcript — "what did you see earlier?" works.
+    try {
+      const session = await getSession();
+      await session.append({ role: "user", content: `[shared screen] ${q}` });
+      await session.append({ role: "assistant", content: answer });
+    } catch {
+      // memory persistence is best-effort
+    }
+    if (!scheduler.isBusy()) {
+            avatarWin().webContents.send(CHANNELS.chatToken, answer);
+      avatarWin().webContents.send(CHANNELS.chatDone, true);
+    }
+    await maybeSpeak(extractEmotion(answer).clean);
     return answer;
   });
 }
+
+
+
+
+

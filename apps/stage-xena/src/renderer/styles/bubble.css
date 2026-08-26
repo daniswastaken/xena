@@ -1,0 +1,209 @@
+/* Speech bubble — clean dark panel anchored to Mao's head. */
+
+#bubble {
+  position: absolute;
+  right: 178px;
+  bottom: 120px;
+  width: fit-content;
+  max-width: 380px;
+  min-width: 80px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  background: #1a2c38;
+  color: #cdd6df;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-shadow: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: bubble-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#bubble.hidden {
+  display: none;
+}
+
+/* Tail — hidden, clean rectangular look. */
+#bubble-tail {
+  display: none;
+}
+
+/* Speaker name label. */
+#bubble-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8ea8b8;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+#bubble-name.hidden {
+  display: none;
+}
+
+/* Reasoning line — shown above name while thinking. */
+#bubble-reason {
+  font-size: 12px;
+  font-style: italic;
+  color: #6b8594;
+  margin-bottom: 8px;
+}
+
+#bubble-reason.hidden {
+  display: none;
+}
+
+/* Message body. */
+#bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 150px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+#bubble-text::-webkit-scrollbar {
+  width: 4px;
+}
+#bubble-text::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+#bubble-text code {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: Consolas, monospace;
+  font-size: 0.9em;
+}
+
+#bubble-text a {
+  color: #6cb4ee;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+#bubble-text.error {
+  color: #f48771;
+}
+
+/* Thinking state: three small pulsing dots, no name/reason. */
+#bubble.thinking #bubble-text {
+  display: flex;
+  gap: 5px;
+  padding: 4px 0;
+  align-items: center;
+}
+
+#bubble-text .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(200, 215, 225, 0.5);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+#bubble-text .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+#bubble-text .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Provider fallback note. */
+#bubble-provider {
+  font-size: 10px;
+  opacity: 0.4;
+  padding-top: 6px;
+  text-align: right;
+}
+
+#bubble-provider.hidden {
+  display: none;
+}
+
+/* Copy button. */
+#bubble-copy {
+  align-self: flex-end;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #9fb0bc;
+  font: 11px/1.4 'Nunito', sans-serif;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+#bubble-copy:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #dde4ea;
+}
+
+#bubble-copy.hidden {
+  display: none;
+}
+
+/* Enter / exit animations. */
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+#bubble.out {
+  animation: bubble-out 150ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes bubble-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+
+/* Mood accents — subtle background tint. */
+#bubble[data-mood="happy"] {
+  background: #2a3428;
+}
+#bubble[data-mood="smug"] {
+  background: #28263a;
+}
+#bubble[data-mood="surprised"] {
+  background: #1e3040;
+}
+#bubble[data-mood="annoyed"] {
+  background: #362228;
+}
+#bubble[data-mood="sleepy"] {
+  background: #222830;
+}

@@ -1,9 +1,10 @@
 /**
- * Summon bar: Spotlight-style single-line input with inline streaming
- * answers. Bottom-anchored so it hugs the avatar below. Auto-fades on
- * idle or after an answer settles.
+ * Summon bar: Spotlight-style single-line input. The reply display lives
+ * in its own chat window — this surface is input + status feedback only.
  */
 import { xena } from "./composables/use-xena-api.js";
+import { startCapture, stopCapture, onRecordingStoppedBySilence } from "./composables/use-mic.js";
+import { stopPlayback } from "./composables/use-voice.js";
 
 const FADE_AFTER_ANSWER_MS = 8000;
 const FADE_IDLE_MS = 10000;
@@ -11,7 +12,15 @@ const FADE_IDLE_MS = 10000;
 const wrap = document.getElementById("bar-wrap") as HTMLElement;
 const input = document.getElementById("bar-input") as HTMLInputElement;
 const dot = document.getElementById("bar-dot") as HTMLElement;
-const answer = document.getElementById("answer") as HTMLDivElement;
+const status = document.getElementById("bar-status") as HTMLDivElement;
+
+function setStatus(text: string, isError = false): void {
+  const effective = text.trim() === "" ? "" : text;
+  status.textContent = effective;
+  status.classList.toggle("hidden", effective === "");
+  status.classList.toggle("error", isError);
+  xena.requestBarResize(effective === "" ? 72 : 96);
+}
 
 let fadeTimer: number | null = null;
 let busy = false;
@@ -41,7 +50,6 @@ function scheduleFade(delayMs: number): void {
 function show(): void {
   cancelFade();
   wrap.classList.remove("hidden", "fading");
-  // Bar is visible now, make window interactive so it can receive focus.
   justShownAt = Date.now();
   setInteractive(true);
   xena.requestBarResize(72);
@@ -51,10 +59,8 @@ function show(): void {
     try {
       input.setSelectionRange(input.value.length, input.value.length);
     } catch {}
-    // If focus was stolen (shake case), re-assert click-through.
     setInteractive(true);
   };
-  // rAF ensures layout applied after display:none removal, then focus.
   requestAnimationFrame(() => {
     focusInput();
     window.setTimeout(focusInput, 30);
@@ -70,8 +76,14 @@ function hide(): void {
   cancelFade();
   wrap.classList.add("hidden");
   wrap.classList.remove("fading");
-  answer.classList.add("hidden");
-  answer.textContent = "";
+  setStatus("");
+  pendingQueue.length = 0;
+  // Esc during a recording cancels it — audio is discarded, not sent.
+  if (recording) {
+    recording = false;
+    dot.classList.remove("thinking");
+    stopCapture();
+  }
   input.value = "";
   busy = false;
   dot.classList.remove("busy");
@@ -85,76 +97,153 @@ function setBusy(on: boolean): void {
   if (on) cancelFade();
 }
 
-function syncWindowSize(): void {
-  // Idle: just the bar (72px). With answer: bar + gap + answer height.
-  if (answer.classList.contains("hidden")) {
-    xena.requestBarResize(72);
-    return;
-  }
-  const h = Math.min(280, answer.scrollHeight);
-  xena.requestBarResize(72 + 8 + h + 12);
-}
-
-function showAnswer(text: string, isError = false): void {
-  answer.textContent = text;
-  answer.classList.toggle("hidden", text === "");
-  answer.classList.toggle("error", isError);
-  syncWindowSize();
+/** Submit-dismiss: hide the bar entirely while she works — the bubble's
+ *  dots are the loading indicator. Keeps busy state + queue intact;
+ *  unlike Esc/hide() it never aborts the stream. */
+function dismissForReply(): void {
+  wrap.classList.add("hidden");
+  wrap.classList.remove("fading");
+  setStatus("");
+  dot.classList.remove("busy");
+  setInteractive(false);
+  xena.barDismissed();
 }
 
 function friendlyError(message: string): string {
   if (/fetch failed|ECONNREFUSED|network/i.test(message)) {
     return "Can't reach 9Router (localhost:20129). Start it with the `9router` command, then retry.";
   }
+  if (/transcription|no audio|HTTP 4\d\d/i.test(message)) {
+    return "Couldn't work out what was said — try again or type it instead.";
+  }
   return message;
 }
 
+const HELP_TEXT = [
+  "Commands:",
+  "/look <question> — share your screen and ask about it",
+  "/point <thing> — I'll point at it on your screen",
+  "/remember <fact> — I'll keep this permanently",
+  "/forget <keyword> — drop matching facts",
+  "/stats — today's conversation stats",
+  "/clear — wipe today's conversation",
+  "/help — this list",
+].join("\n");
+
+// Messages typed while a reply streams queue up (max 2) and send after.
+const pendingQueue: string[] = [];
+
 async function submit(raw: string): Promise<void> {
   const text = raw.trim();
-  if (text === "" || busy) return;
+  if (text === "") return;
+  // Typing while recording: the typed message wins, audio is discarded.
+  if (recording) {
+    recording = false;
+    dot.classList.remove("thinking");
+    stopCapture();
+  }
+  if (busy) {
+    if (pendingQueue.length < 2) {
+      pendingQueue.push(text);
+      setStatus("queued — will send after this reply");
+    }
+    return;
+  }
   input.value = "";
+  if (history[history.length - 1] !== text) history.push(text);
+  if (history.length > 20) history.shift();
+  historyIndex = -1;
+  historyDraft = "";
   xena.noteActivity();
   cancelFade();
   setBusy(true);
-  answer.classList.remove("error");
 
   if (text === "/clear") {
     await xena.clearChat();
     setBusy(false);
-    showAnswer("Fresh start. What do you need?");
+    setStatus("Fresh start. What do you need?");
     scheduleFade(FADE_AFTER_ANSWER_MS);
     return;
   }
 
-  if (text.startsWith("/look")) {
-    const question = text.slice(5).trim() || "What am I looking at?";
+  if (text === "/help") {
+    setBusy(false);
+    setStatus(HELP_TEXT);
+    scheduleFade(FADE_AFTER_ANSWER_MS + 4000);
+    return;
+  }
+
+  if (text === "/stats") {
     try {
-      const result = await xena.askVision(question);
+      const stats = await xena.getStats();
       setBusy(false);
-      showAnswer(result);
+      setStatus(stats);
       scheduleFade(FADE_AFTER_ANSWER_MS);
     } catch (err) {
       setBusy(false);
-      showAnswer(friendlyError((err as Error).message), true);
+      setStatus(friendlyError((err as Error).message), true);
       scheduleFade(FADE_AFTER_ANSWER_MS);
     }
     return;
   }
 
+  if (text.startsWith("/forget ")) {
+    try {
+      const confirmation = await xena.forget(text.slice(8));
+      setBusy(false);
+      setStatus(confirmation);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    } catch (err) {
+      setBusy(false);
+      setStatus(friendlyError((err as Error).message), true);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    }
+    return;
+  }
+
+  if (text.startsWith("/remember ")) {
+    try {
+      const confirmation = await xena.remember(text.slice(10));
+      setBusy(false);
+      setStatus(confirmation);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    } catch (err) {
+      setBusy(false);
+      setStatus(friendlyError((err as Error).message), true);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    }
+    return;
+  }
+
+  // /look and /point results display in the chat window (main broadcasts).
+
+  // Streaming paths: the bar gets out of the way — the bubble takes over
+  // with the animated dots. Instant commands below keep the bar visible.
+  dismissForReply();
+
   try {
-    await xena.sendChat(text);
+    if (text.startsWith("/look")) {
+      await xena.askVision(text.slice(5).trim() || "What am I looking at?");
+    } else if (text.startsWith("/point ")) {
+      await xena.pointAt(text.slice(7));
+    } else {
+      await xena.sendChat(text);
+    }
   } catch (err) {
     setBusy(false);
-    showAnswer(friendlyError((err as Error).message), true);
+    show();
+    setStatus(friendlyError((err as Error).message), true);
     scheduleFade(FADE_AFTER_ANSWER_MS);
+    return;
   }
+  // chatDone clears this when the reply was broadcast; when the broadcast
+  // was skipped (stream busy), clear the status here instead.
+  setBusy(false);
+  setStatus("");
 }
 
 let justShownAt = 0;
 
-// Keep window interactive for a grace period after show so the
-// focus-steal/mousemove race can't re-enable click-through before
-// the first keystroke lands.
 document.addEventListener("mousemove", (event) => {
   if (wrap.classList.contains("hidden")) {
     setInteractive(false);
@@ -170,35 +259,97 @@ document.addEventListener("mousemove", (event) => {
 
 xena.onSummon(() => show());
 
-// If OS focus arrives late, keep input focused while bar visible.
 window.addEventListener("focus", () => {
   if (!wrap.classList.contains("hidden")) {
     requestAnimationFrame(() => input.focus());
   }
 });
 
-xena.onChatToken((full) => {
-  setBusy(false);
-  showAnswer(full);
-  answer.scrollTop = answer.scrollHeight;
+// Reasoning dot: input-side liveliness while the model thinks.
+xena.onChatThinking((active) => {
+  dot.classList.toggle("thinking", active);
+  if (active) setStatus("thinking…");
 });
 
 xena.onChatDone(() => {
   setBusy(false);
-  scheduleFade(FADE_AFTER_ANSWER_MS);
+  dot.classList.remove("thinking");
+  setStatus("");
+  const next = pendingQueue.shift();
+  if (next !== undefined) {
+    void submit(next);
+  }
 });
 
 xena.onChatError((message) => {
   setBusy(false);
-  showAnswer(friendlyError(message), true);
+  dot.classList.remove("thinking");
+  setStatus(friendlyError(message), true);
   scheduleFade(FADE_AFTER_ANSWER_MS);
 });
 
-xena.onProactive((text) => {
-  show();
-  showAnswer(text);
-  scheduleFade(FADE_AFTER_ANSWER_MS);
+// Push-to-talk: Ctrl+Alt+V starts/stops capture; on stop the audio is
+// transcribed and auto-submitted as a chat message.
+let recording = false;
+xena.onVoiceRecord((active) => {
+  if (active === recording) return;
+  recording = active;
+  if (active) {
+    // Barge-in: kill Xena's voice so the mic doesn't hear her own TTS.
+    stopPlayback();
+    void startCapture().then(() => {
+      show();
+      cancelFade(); // a long speech must not hit the 10s idle fade
+      setStatus("listening… (speak, then pause — or Ctrl+Alt+V to stop)");
+      dot.classList.add("thinking");
+    }).catch(() => {
+      setStatus("Microphone unavailable — check Windows privacy settings.", true);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    });
+    return;
+  }
+  dot.classList.remove("thinking");
+  const wav = stopCapture();
+  void finishRecording(wav);
 });
+
+// Auto-stop: silence after speech ends the recording on its own.
+onRecordingStoppedBySilence(() => {
+  if (!recording) return;
+  recording = false;
+  dot.classList.remove("thinking");
+  const wav = stopCapture();
+  void finishRecording(wav);
+});
+
+function finishRecording(wav: string | null): void {
+  if (wav === null) {
+    setStatus("Didn't catch that — no audio recorded.", true);
+    scheduleFade(FADE_AFTER_ANSWER_MS);
+    return;
+  }
+  setStatus("transcribing…");
+  void xena
+    .sendVoiceAudio(wav)
+    .then((text) => {
+      if (text.trim() !== "") {
+        setStatus(`you said: ${text}`);
+        void submit(text);
+      } else {
+        setStatus("Heard nothing usable.", true);
+        scheduleFade(FADE_AFTER_ANSWER_MS);
+      }
+    })
+    .catch((err) => {
+      setStatus(friendlyError((err as Error).message), true);
+      scheduleFade(FADE_AFTER_ANSWER_MS);
+    });
+}
+
+// Input history: up/down walks previously sent messages.
+const history: string[] = [];
+let historyIndex = -1;
+let historyDraft = "";
 
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
@@ -206,6 +357,26 @@ input.addEventListener("keydown", (event) => {
     void submit(input.value);
   } else if (event.key === "Escape") {
     hide();
+  } else if (event.key === "ArrowUp") {
+    if (history.length === 0) return;
+    event.preventDefault();
+    if (historyIndex === -1) {
+      historyDraft = input.value;
+      historyIndex = history.length - 1;
+    } else if (historyIndex > 0) {
+      historyIndex--;
+    }
+    input.value = history[historyIndex] ?? "";
+  } else if (event.key === "ArrowDown") {
+    if (historyIndex === -1) return;
+    event.preventDefault();
+    historyIndex++;
+    if (historyIndex >= history.length) {
+      historyIndex = -1;
+      input.value = historyDraft;
+    } else {
+      input.value = history[historyIndex] ?? "";
+    }
   } else {
     xena.noteActivity();
     scheduleFade(FADE_IDLE_MS);
