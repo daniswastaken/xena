@@ -1,5 +1,15 @@
 export * from "./types.js";
 export { loadConfig, type Router9Config } from "./config.js";
-export { chatComplete, streamChat } from "./chat/completions.js";
+export { chatComplete, streamChat, parseCompletionBody } from "./chat/completions.js";
+export {
+  chatCompleteFailover,
+  visionCompleteFailover,
+  streamChatFailover,
+  buildProviderChain,
+  buildVisionChain,
+  type FailoverChatOptions,
+  type FailoverResult,
+  type ProviderTarget,
+} from "./chat/failover.js";
 export { askAboutImage, buildImageMessage, imageDataUrl } from "./vision/ask.js";
 export { listModels, isVisionCapable } from "./models/registry.js";

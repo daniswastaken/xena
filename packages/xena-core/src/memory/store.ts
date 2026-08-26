@@ -1,9 +1,11 @@
 /**
- * Transcript persistence — JSON file, one session per file.
- * Upgrade path: SQLite behind the same interface.
+ * Transcript persistence — SQLite (node:sqlite, zero deps) with one row per
+ * session; messages stored as a JSON column. Legacy per-day JSON files are
+ * imported once on first sight. Diary + facts stay as files (human-editable).
  */
-import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { ChatMessage } from "@xena/router9-client";
 
 export interface SessionMeta {
@@ -18,53 +20,112 @@ export interface StoredTranscript {
 }
 
 export class MemoryStore {
-  constructor(private readonly baseDir: string) {}
+  private readonly db: DatabaseSync;
+  private readonly baseDir: string;
 
-  private pathFor(sessionId: string): string {
-    return join(this.baseDir, `${sessionId}.json`);
+  constructor(baseDir: string) {
+    this.baseDir = baseDir;
+    mkdirSync(baseDir, { recursive: true });
+    this.db = new DatabaseSync(join(baseDir, "transcripts.db"));
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        messages TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at);
+    `);
+    this.importLegacyJsonFiles();
   }
 
   async load(sessionId: string): Promise<StoredTranscript | null> {
-    try {
-      const raw = await readFile(this.pathFor(sessionId), "utf8");
-      return JSON.parse(raw) as StoredTranscript;
-    } catch {
-      return null;
-    }
+    const row = this.db
+      .prepare("SELECT id, started_at, updated_at, messages FROM sessions WHERE id = ?")
+      .get(sessionId) as
+      | { id: string; started_at: string; updated_at: string; messages: string }
+      | undefined;
+    if (!row) return null;
+    return {
+      meta: { id: row.id, startedAt: row.started_at, updatedAt: row.updated_at },
+      messages: JSON.parse(row.messages) as ChatMessage[],
+    };
   }
 
   async save(transcript: StoredTranscript): Promise<void> {
-    const file = this.pathFor(transcript.meta.id);
-    await mkdir(dirname(file), { recursive: true });
-    transcript.meta.updatedAt = new Date().toISOString();
-    await writeFile(file, JSON.stringify(transcript, null, 2), "utf8");
+    const now = new Date().toISOString();
+    const meta = transcript.meta;
+    this.db
+      .prepare(
+        `INSERT INTO sessions (id, started_at, updated_at, messages) VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at, messages = excluded.messages`,
+      )
+      .run(meta.id, meta.startedAt || now, now, JSON.stringify(transcript.messages));
   }
 
-  /** Deletes transcript files not modified within `days`. Returns count removed. */
+  async listAll(): Promise<StoredTranscript[]> {
+    const rows = this.db
+      .prepare("SELECT id, started_at, updated_at, messages FROM sessions ORDER BY updated_at")
+      .all() as Array<{ id: string; started_at: string; updated_at: string; messages: string }>;
+    return rows.map((row) => ({
+      meta: { id: row.id, startedAt: row.started_at, updatedAt: row.updated_at },
+      messages: JSON.parse(row.messages) as ChatMessage[],
+    }));
+  }
+
+  /** Deletes sessions not modified within `days`. Returns count removed. */
   async pruneOlderThan(days: number): Promise<number> {
-    const cutoff = Date.now() - days * 24 * 60 * 60_000;
-    let removed = 0;
-    let entries: string[];
+    const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+    const result = this.db.prepare("DELETE FROM sessions WHERE updated_at < ?").run(cutoff);
+    return Number(result.changes);
+  }
+
+  /** Releases the SQLite file handle (Windows locks open DBs). */
+  close(): void {
     try {
-      entries = await readdir(this.baseDir);
+      this.db.close();
     } catch {
-      return 0;
+      // already closed
     }
-    for (const name of entries) {
+  }
+
+  /**
+   * One-time import of pre-SQLite per-day JSON transcripts. Files already
+   * present in the DB are skipped, so this is cheap after the first run.
+   */
+  private importLegacyJsonFiles(): void {
+    let names: string[];
+    try {
+      names = readdirSync(this.baseDir);
+    } catch {
+      return;
+    }
+    const known = new Set(
+      (this.db.prepare("SELECT id FROM sessions").all() as Array<{ id: string }>).map((r) => r.id),
+    );
+    for (const name of names) {
       if (!name.endsWith(".json")) continue;
-      const file = join(this.baseDir, name);
       try {
-        const raw = await readFile(file, "utf8");
-        const parsed = JSON.parse(raw) as StoredTranscript;
-        const stamp = Date.parse(parsed.meta?.updatedAt ?? "");
-        if (!Number.isNaN(stamp) && stamp < cutoff) {
-          await unlink(file);
-          removed++;
-        }
+        const parsed = JSON.parse(
+          readFileSync(join(this.baseDir, name), "utf8"),
+        ) as StoredTranscript;
+        if (!parsed?.meta?.id || known.has(parsed.meta.id)) continue;
+        if (!Array.isArray(parsed.messages)) continue;
+        this.db
+          .prepare("INSERT OR IGNORE INTO sessions (id, started_at, updated_at, messages) VALUES (?, ?, ?, ?)")
+          .run(
+            parsed.meta.id,
+            parsed.meta.startedAt || nowIso(),
+            parsed.meta.updatedAt || nowIso(),
+            JSON.stringify(parsed.messages),
+          );
       } catch {
-        // unreadable file — leave it alone
+        // unreadable legacy file — skip
       }
     }
-    return removed;
   }
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
 }

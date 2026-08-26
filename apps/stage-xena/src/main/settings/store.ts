@@ -8,6 +8,18 @@ export interface XenaSettings {
   voiceEnabled: boolean;
   proactiveEnabled: boolean;
   shakeEnabled: boolean;
+  /** experimental Live2D stage (pixi) instead of PNG sprites */
+  live2dEnabled: boolean;
+  /** folder name under assets/live2d/; empty = first available */
+  live2dModel: string;
+  /** launch Xena when Windows starts */
+  autostartEnabled: boolean;
+  /** Edge TTS voice id; empty = default (Aria) */
+  ttsVoice: string;
+  /** periodic one-line screen observations, visible as proactive comments */
+  ambientEnabled: boolean;
+  /** push-to-talk voice input (Ctrl+Alt+V) */
+  voiceInputEnabled: boolean;
   /** oc/* model id; empty = default from .env */
   textModel: string;
 }
@@ -16,6 +28,12 @@ const DEFAULTS: XenaSettings = {
   voiceEnabled: true,
   proactiveEnabled: true,
   shakeEnabled: true,
+  live2dEnabled: false,
+  live2dModel: "",
+  autostartEnabled: false,
+  ttsVoice: "",
+  ambientEnabled: false,
+  voiceInputEnabled: true,
   textModel: "",
 };
 

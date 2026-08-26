@@ -1,23 +1,32 @@
 /**
- * Voice playback: plays TTS mp3, drives mouth flap for the duration.
+ * Voice playback: plays TTS mp3, drives the mouth for the duration.
+ * Accepts any mouth facade (PNG flap, Live2D stage, or both).
  */
-import type { MouthFlap } from "../modules/avatar/mouth-flap.js";
+export interface Mouth {
+  start(): void;
+  stop(): void;
+}
 
 let current: HTMLAudioElement | null = null;
 
-export function initVoice(flap: MouthFlap): void {
+/** Stops any in-flight TTS playback (barge-in / echo prevention). */
+export function stopPlayback(): void {
+  if (current) {
+    current.pause();
+    current = null;
+  }
+}
+
+export function initVoice(mouth: Mouth): void {
   window.xena.onTtsAudio((base64) => {
-    if (current) {
-      current.pause();
-      current = null;
-    }
+    stopPlayback();
     const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
     current = audio;
-    audio.addEventListener("play", () => flap.start());
+    audio.addEventListener("play", () => mouth.start());
     const stop = (): void => {
       if (current === audio) {
         current = null;
-        flap.stop();
+        mouth.stop();
       }
     };
     audio.addEventListener("ended", stop);
