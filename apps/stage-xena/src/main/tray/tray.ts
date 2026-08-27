@@ -4,7 +4,6 @@
  */
 import { app, Menu, Tray, nativeImage } from "electron";
 import { join } from "node:path";
-import { VOICES } from "@xena/tts";
 import type { SettingsStore } from "../settings/store.js";
 import type { BarWindow } from "../window/bar-window.js";
 
@@ -26,9 +25,8 @@ export function createTray(
   tray.setToolTip("Xena — Ctrl+Alt+X or shake cursor");
 
   const rebuild = async (): Promise<void> => {
-    const { voiceEnabled, proactiveEnabled, shakeEnabled, avatarEnabled, autostartEnabled, ttsVoice, ambientEnabled, voiceInputEnabled } =
+    const { voiceEnabled, proactiveEnabled, shakeEnabled, avatarEnabled, autostartEnabled, ambientEnabled, voiceInputEnabled } =
       await settings.get();
-    const effectiveVoice = ttsVoice || VOICES[0];
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
@@ -85,19 +83,6 @@ export function createTray(
           click: () => {
             void settings.set({ voiceInputEnabled: !voiceInputEnabled }).then(() => void rebuild());
           },
-        },
-        {
-          label: "Voice",
-          submenu: [
-            ...VOICES.map((id) => ({
-              label: id.replace("Neural", "").replace("en-US-", "").replace("en-GB-", "UK ").replace("ja-JP-", "JP "),
-              type: "radio" as const,
-              checked: id === effectiveVoice,
-              click: () => {
-                void settings.set({ ttsVoice: id }).then(() => void rebuild());
-              },
-            })),
-          ],
         },
         { type: "separator" },
         { label: "Quit Xena", role: "quit" },

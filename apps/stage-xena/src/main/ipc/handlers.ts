@@ -124,10 +124,10 @@ export function registerIpcHandlers(
   setTimeout(() => void maybeFirstRunGreeting(), 90_000);
 
   async function maybeSpeak(text: string, mood?: string): Promise<void> {
-    const { voiceEnabled, ttsVoice } = await settings.get();
+    const { voiceEnabled } = await settings.get();
     if (!voiceEnabled || text.trim() === "") return;
     try {
-      const audio = await speakReply(text, ttsVoice || undefined, mood);
+      const audio = await speakReply(text, mood);
       avatarWin().webContents.send(CHANNELS.ttsAudio, audio);
     } catch {
       // Voice is best-effort — never break chat over TTS failure.

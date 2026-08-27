@@ -108,9 +108,9 @@ let gaze: GazeTracker | null = null;
         if (clean === "") return;
         avatar.webContents.send(CHANNELS.avatarEmote, emotion ?? "");
         avatar.webContents.send(CHANNELS.chatProactive, clean);
-        const { voiceEnabled, ttsVoice } = await settings.get();
+        const { voiceEnabled } = await settings.get();
         if (voiceEnabled) {
-          const audio = await speakReply(clean, ttsVoice || undefined, emotion ?? undefined).catch(() => null);
+          const audio = await speakReply(clean, emotion ?? undefined).catch(() => null);
           if (audio) avatar.webContents.send("tts:audio", audio);
         }
       } catch {
@@ -123,9 +123,9 @@ let gaze: GazeTracker | null = null;
       settings,
       config,
       async (comment, mood) => {
-        const { voiceEnabled, ttsVoice } = await settings.get();
+        const { voiceEnabled } = await settings.get();
         if (!voiceEnabled) return;
-        const audio = await speakReply(comment, ttsVoice || undefined, mood).catch(() => null);
+        const audio = await speakReply(comment, mood).catch(() => null);
         if (audio) avatar.webContents.send("tts:audio", audio);
       },
       async () => {
@@ -161,9 +161,9 @@ let gaze: GazeTracker | null = null;
       async () => (await settings.get()).ambientEnabled,
       () => scheduler.isBusy(),
       async (observation, mood) => {
-        const { voiceEnabled, ttsVoice } = await settings.get();
+        const { voiceEnabled } = await settings.get();
         if (!voiceEnabled) return;
-        const audio = await speakReply(observation, ttsVoice || undefined, mood).catch(() => null);
+        const audio = await speakReply(observation, mood).catch(() => null);
         if (audio) avatar.webContents.send("tts:audio", audio);
       },
       join(process.cwd(), "data", "diary"),

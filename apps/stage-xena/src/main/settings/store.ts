@@ -14,8 +14,6 @@ export interface XenaSettings {
   live2dModel: string;
   /** launch Xena when Windows starts */
   autostartEnabled: boolean;
-  /** Edge TTS voice id; empty = default (Aria) */
-  ttsVoice: string;
   /** periodic one-line screen observations, visible as proactive comments */
   ambientEnabled: boolean;
   /** push-to-talk voice input (Ctrl+Alt+V) */
@@ -31,7 +29,6 @@ const DEFAULTS: XenaSettings = {
   avatarEnabled: true,
   live2dModel: "",
   autostartEnabled: false,
-  ttsVoice: "",
   ambientEnabled: false,
   voiceInputEnabled: true,
   textModel: "",

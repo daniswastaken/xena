@@ -4,32 +4,13 @@
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import type { ProsodyOptions } from "msedge-tts";
 
-export const DEFAULT_VOICE = "en-US-AriaNeural";
-
-export const VOICES = [
-  "en-US-AriaNeural",
-  "en-US-JennyNeural",
-  "en-US-GuyNeural",
-  "en-GB-SoniaNeural",
-  "en-GB-RyanNeural",
-  "ja-JP-NanamiNeural",
-  "ja-JP-KeitaNeural",
-] as const;
-
-export type VoiceId = (typeof VOICES)[number];
+export const DEFAULT_VOICE = "ja-JP-NanamiNeural";
 
 /**
- * Per-mood prosody — the voice acts the emotion instead of flat-reading.
- * Relative SSML values; subtle by design so it never sounds cartoonish.
+ * Xena speaks exclusively in JP Nanami. Her voice is always the "happy" read
+ * regardless of the expression driving her face — one consistent gremlin voice.
  */
-const MOOD_PROSODY: Record<string, ProsodyOptions> = {
-  happy: { rate: "+8%", pitch: "+10%" },
-  smug: { rate: "-4%", pitch: "-5%" },
-  surprised: { rate: "+14%", pitch: "+16%" },
-  annoyed: { rate: "+6%", pitch: "-6%" },
-  sleepy: { rate: "-16%", pitch: "-9%", volume: "soft" },
-  sad: { rate: "-14%", pitch: "-8%", volume: "soft" },
-};
+const XENA_PROSODY: ProsodyOptions = { rate: "+8%", pitch: "+10%" };
 
 let client: MsEdgeTTS | null = null;
 let clientVoice = "";
@@ -51,15 +32,14 @@ async function getClient(voice: string): Promise<MsEdgeTTS> {
   return client;
 }
 
-/** Synthesizes text to a base64-encoded MP3 in the given voice (+ mood prosody). */
+/** Synthesizes text to a base64-encoded MP3 in Xena's voice (always JP Nanami, happy read). */
 export async function speakToBase64(
   text: string,
-  voice: string = DEFAULT_VOICE,
-  mood?: string,
+  _voice: string = DEFAULT_VOICE,
+  _mood?: string,
 ): Promise<string> {
-  const tts = await getClient(voice);
-  const prosody = mood ? MOOD_PROSODY[mood] : undefined;
-  const { audioStream } = await tts.toStream(text, prosody);
+  const tts = await getClient(DEFAULT_VOICE);
+  const { audioStream } = await tts.toStream(text, XENA_PROSODY);
   const chunks: Buffer[] = [];
   for await (const chunk of audioStream) {
     chunks.push(chunk as Buffer);
