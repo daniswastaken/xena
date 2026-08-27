@@ -109,7 +109,7 @@ export function registerIpcHandlers(
               "This is the very first time we meet. Say ONE short friendly intro (max 12 words) — you just woke up as a witch sprite in Father's screen corner.",
           },
         ],
-        { maxTokens: 300, temperature: 1.0 },
+        { maxTokens: 70, temperature: 1.0 },
         config,
       );
       const { clean, emotion } = extractEmotion(result.content.trim());

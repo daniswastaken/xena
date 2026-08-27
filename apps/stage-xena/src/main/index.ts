@@ -38,6 +38,7 @@ app.setAppUserModelId("com.xena.app");
 
 // Weak iGPU target: keep Chromium from spawning extra GPU processes when possible.
 app.commandLine.appendSwitch("disable-gpu-sandbox");
+app.commandLine.appendSwitch("log-level", "3");
 // Suppress noisy AMD DirectComposition error from child GPU process.
 process.env.ELECTRON_ENABLE_LOGGING = "0";
 process.env.ELECTRON_ENABLE_STACK_DUMPING = "0";
@@ -101,7 +102,7 @@ let gaze: GazeTracker | null = null;
                 "Greet them back in ONE short line (max 10 words).",
             },
           ],
-          { maxTokens: 500, temperature: 1.0 },
+          { maxTokens: 70, temperature: 1.0 },
           config,
         );
         const { clean, emotion } = extractEmotion(result.content.trim());

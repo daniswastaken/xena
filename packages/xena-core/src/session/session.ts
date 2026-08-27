@@ -89,7 +89,7 @@ export class Session {
         payload,
         {
           model: this.model,
-          maxTokens: 700,
+          maxTokens: 150,
           signal: this.controller.signal,
           onReasoning: (delta) => events.onReasoning?.(delta),
         },

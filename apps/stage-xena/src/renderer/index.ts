@@ -59,15 +59,54 @@ void xena
   .catch(() => undefined);
 
 let ttsPlaying = false;
+let audioPending = false;
+let pendingText: string | null = null;
+let lastReplyChars = 0;
+let fallbackTimer: number | null = null;
+
+function clearFallbackTimer(): void {
+  if (fallbackTimer !== null) {
+    window.clearTimeout(fallbackTimer);
+    fallbackTimer = null;
+  }
+}
+
+function revealPendingTextImmediate(): void {
+  clearFallbackTimer();
+  audioPending = false;
+  setThinking(false);
+  if (pendingText !== null && pendingText.trim() !== "") {
+    showBubble(pendingText);
+    scheduleBubbleFade(Math.min(28_000, 8000 + 20 * pendingText.length));
+  }
+}
+
 initVoice({
+  onAudioReceived: () => {
+    audioPending = true;
+    clearFallbackTimer();
+    cancelBubbleFade();
+  },
   start: () => {
+    clearFallbackTimer();
+    audioPending = false;
     ttsPlaying = true;
     l2d?.setGaze(0, 0);
     l2d?.setTalking(true);
+
+    if (pendingText !== null && pendingText.trim() !== "") {
+      setThinking(false);
+      showBubble(pendingText);
+    }
+    cancelBubbleFade();
   },
   stop: () => {
     ttsPlaying = false;
     l2d?.setTalking(false);
+    if (pendingText !== null && pendingText.trim() !== "") {
+      scheduleBubbleFade(3000);
+      pendingText = null;
+    }
   },
 });
 
@@ -96,12 +135,13 @@ xena.onGaze(({ dx, dy }) => {
 });
 
 // Reply events render as speech bubbles anchored to Mao.
-let lastReplyChars = 0;
 xena.onChatToken((full) => {
   cancelBubbleFade();
-  armAutoFade();
-  lastReplyChars = full.length;
-  showBubble(cleanForDisplay(full));
+  const cleaned = cleanForDisplay(full);
+  pendingText = cleaned;
+  lastReplyChars = cleaned.length;
+  // Hold thinking dots while streaming & waiting for TTS audio.
+  setThinking(true);
 });
 
 xena.onChatThinking((active) => {
@@ -111,18 +151,35 @@ xena.onChatThinking((active) => {
 xena.onChatProvider((p) => setProviderNote(p));
 
 xena.onChatDone(() => {
-  setThinking(false);
-  scheduleBubbleFade(Math.min(28_000, 8000 + 20 * lastReplyChars));
+  clearFallbackTimer();
+  if (ttsPlaying || audioPending) {
+    // Audio is playing or on its way over IPC — hold until onplay / stop handles it.
+    return;
+  }
+  // Fallback: if voice is disabled or TTS audio doesn't arrive within 1200ms, reveal text.
+  fallbackTimer = window.setTimeout(() => {
+    revealPendingTextImmediate();
+  }, 1200);
 });
 
 xena.onChatError((message) => {
+  clearFallbackTimer();
+  audioPending = false;
+  pendingText = null;
   showBubble(message, true);
   scheduleBubbleFade(8000);
 });
 
 xena.onProactive((text) => {
-  showBubble(cleanForDisplay(text));
-  armAutoFade();
+  cancelBubbleFade();
+  const cleaned = cleanForDisplay(text);
+  pendingText = cleaned;
+  lastReplyChars = cleaned.length;
+  setThinking(true);
+  clearFallbackTimer();
+  fallbackTimer = window.setTimeout(() => {
+    revealPendingTextImmediate();
+  }, 1200);
 });
 
 // Occasional unprompted mood flickers / gestures while idle — she has

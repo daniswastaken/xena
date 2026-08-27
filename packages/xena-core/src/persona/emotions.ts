@@ -58,7 +58,8 @@ export function extractFactTags(text: string): FactParseResult {
   return { clean, facts };
 }
 
-/** Full presentation cleanup: mood tags + fact tags. */
+/** Full presentation cleanup: mood tags + fact tags + roleplay action asterisks. */
 export function cleanForDisplay(text: string): string {
-  return extractFactTags(extractEmotion(text).clean).clean;
+  const noActions = text.replace(/\*[^*]+\*/g, "").trim();
+  return extractFactTags(extractEmotion(noActions).clean).clean;
 }

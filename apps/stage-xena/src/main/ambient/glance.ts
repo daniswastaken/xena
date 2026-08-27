@@ -59,7 +59,7 @@ export class GlanceTimer {
             ],
           },
         ],
-        { maxTokens: 700 },
+        { maxTokens: 80 },
         this.config,
       );
       const { clean, emotion } = extractEmotion(result.content.trim());

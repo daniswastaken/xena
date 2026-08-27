@@ -28,7 +28,7 @@ export async function askAboutImage(
       buildImageMessage(question, dataUrl),
     ],
     // Vision upstreams are reasoning-style; needs generous token budget.
-    { maxTokens: 600 },
+    { maxTokens: 120 },
     config,
   );
   return result.content;

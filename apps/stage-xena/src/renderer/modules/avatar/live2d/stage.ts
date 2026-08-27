@@ -13,6 +13,7 @@ import { Live2DModel } from "pixi-live2d-display/cubism4";
 // Bundled pixi: register ticker explicitly; patch out `new Function` usage
 // (CSP forbids unsafe-eval).
 install(PIXI);
+PIXI.utils.skipHello();
 Live2DModel.registerTicker(PIXI.Ticker);
 
 /**
@@ -113,6 +114,7 @@ export class Live2DStage {
     internal.update = (m: unknown, now: number): void => {
       originalUpdate(m, now);
       this.applyGaze();
+      this.applyMouthFlap();
     };
 
     app.ticker.add(this.tick);
@@ -284,7 +286,7 @@ export class Live2DStage {
     }
   }
 
-  private tick = (): void => {
+  private applyMouthFlap(): void {
     const core = this.model?.internalModel.coreModel as
       | { setParameterValueById?: (id: string, value: number) => void }
       | undefined;
@@ -315,6 +317,13 @@ export class Live2DStage {
         core.setParameterValueById(v, 0);
       }
     }
+  }
+
+  private tick = (): void => {
+    const core = this.model?.internalModel.coreModel as
+      | { setParameterValueById?: (id: string, value: number) => void }
+      | undefined;
+    if (!core?.setParameterValueById) return;
     this.applyBlink(core);
   };
 }

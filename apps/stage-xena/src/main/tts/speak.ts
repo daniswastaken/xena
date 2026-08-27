@@ -3,6 +3,7 @@
  * Free Edge read-aloud — no API key, no token burn. Mood acts the emotion.
  */
 import { speakToBase64 } from "@xena/tts";
+import { translateToJapanese } from "./translate.js";
 
 export async function speakReply(
   text: string,
@@ -10,5 +11,6 @@ export async function speakReply(
 ): Promise<string> {
   // Strip markdown-ish noise that reads badly aloud.
   const clean = text.replace(/[*_`#>]/g, "").slice(0, 600);
-  return speakToBase64(clean);
+  const jaText = await translateToJapanese(clean);
+  return speakToBase64(jaText);
 }

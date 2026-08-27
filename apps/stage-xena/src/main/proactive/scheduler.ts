@@ -102,7 +102,7 @@ export class ProactiveScheduler {
           },
         ],
         // Reasoning upstream needs headroom or the visible answer truncates.
-        { model: this.config.textModel, maxTokens: 500, temperature: 1.0 },
+        { model: this.config.textModel, maxTokens: 70, temperature: 1.0 },
         this.config,
       );
       const { clean, emotion } = extractEmotion(result.content.trim());
