@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fafafa"/>
+      <stop offset="1" stop-color="#e6e6e6"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="398" height="118" rx="18" fill="url(#win)" stroke="#cfcfcf" stroke-width="1"/>
+  <g transform="translate(28,60)">
+    <path d="M0 -20 L0 14 L18 18 L18 -16 Z" fill="#0078d4"/>
+    <path d="M22 -20 L22 18 L40 22 L40 -14 Z" fill="#0078d4"/>
+    <path d="M0 18 L0 22 L18 26 L18 22 Z" fill="#0078d4" opacity="0.7"/>
+    <path d="M22 22 L22 26 L40 30 L40 26 Z" fill="#0078d4" opacity="0.7"/>
+  </g>
+  <text x="100" y="58" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" fill="#1a1a1a">Run on Windows 11</text>
+  <text x="100" y="84" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="500" fill="#5a5a5a">pnpm install · pnpm start</text>
+</svg>
