@@ -1,7 +1,8 @@
 /**
- * Live2D stage (experimental): pixi.js + pixi-live2d-display rendering a
- * Cubism 4 model in place of the PNG sprite. Mouth flap driven by the same
- * talking signal the PNGtuber uses; idle motion plays automatically.
+ * Live2D stage: pixi.js + pixi-live2d-display rendering the Cubism 4 model
+ * (Mao) as the corner avatar. Mouth flap driven by the talking signal; idle
+ * motion plays automatically. This is the sole avatar — the PNG sprite
+ * stage was retired.
  *
  * Requires window.Live2DCubismCore (loaded from assets/vendor in index.html).
  */
@@ -58,6 +59,7 @@ export class Live2DStage {
   private lastExpression = "";
   private tiltBias = 0;
   private currentMood = "";
+  private moodDecayTimer: number | null = null;
 
   constructor(private readonly modelDir: string) {}
 
@@ -125,6 +127,27 @@ export class Live2DStage {
     this.gaze = { dx, dy };
   }
 
+  /**
+   * Apply a mood: an empty string returns to neutral immediately, any other
+   * mood fires a flourish and auto-decays back to neutral after a hold so the
+   * face doesn't stay stuck. Replaces the PNG EmoteStage's decay role.
+   */
+  setMood(emotion: string): void {
+    if (this.moodDecayTimer !== null) {
+      window.clearTimeout(this.moodDecayTimer);
+      this.moodDecayTimer = null;
+    }
+    if (emotion === "") {
+      this.resetExpression();
+      return;
+    }
+    this.playMoodFlourish(emotion);
+    this.moodDecayTimer = window.setTimeout(() => {
+      this.moodDecayTimer = null;
+      this.resetExpression();
+    }, 12_000);
+  }
+
   /** Mood flourish: random expression variant + TapBody motion. */
   playMoodFlourish(mood: string): void {
     if (!this.model) return;
@@ -175,6 +198,10 @@ export class Live2DStage {
   }
 
   destroy(): void {
+    if (this.moodDecayTimer !== null) {
+      window.clearTimeout(this.moodDecayTimer);
+      this.moodDecayTimer = null;
+    }
     if (this.app) this.app.ticker.remove(this.tick);
     this.model?.destroy();
     this.model = null;

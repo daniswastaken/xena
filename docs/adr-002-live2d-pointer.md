@@ -11,7 +11,7 @@ are on screen, not just describe them.
 
 ## Decisions
 
-### Live2D stage (experimental, tray toggle, default OFF)
+### Live2D avatar (sole avatar, tray toggle, default ON)
 
 - **pixi.js 6 + pixi-live2d-display (cubism4)** — the plugin's peer range
   pins pixi v6; v7 breaks its interaction manager. pnpm `overrides` pin
@@ -34,21 +34,21 @@ are on screen, not just describe them.
 
 ### AI Pointer (dual-cursor)
 
-- Trigger paths: explicit `/point <thing>`, or natural-language
-  `[point: target]` tags the persona appends when directing the user to
-  plausibly-visible UI (multiple tags = sequential steps, 4.5s apart).
-- **Locate**: screen capture → vision chain (9Router → minimax-m3:free →
-  ox-alpha) → JSON `{x,y}` normalized coords; code-fence tolerant.
+- Trigger path: natural-language instructional requests such as "How do I
+  open YouTube?".
+- **Plan**: each fresh screen capture goes through vision, which returns one
+  visible target, normalized `{x,y}` coordinates, action status, and a
+  human-readable instruction. Visual screen change starts the next cycle.
 - **Render**: `PointerWindow` — transparent, click-through, never
   focusable, always-on-top. Coordinates map against **full display
   bounds** (captures include the taskbar; workArea clips it). Arrival
   plays a click-pulse; travel is a quad-eased glide; 9s dwell.
-- Privacy stance: pointing is user-initiated (command or direct answer);
-  the model must not point at non-visible targets.
+- Privacy stance: tasks start from user chat, capture only while task runs,
+  and never click, type, or control the user's computer.
 
 ## Consequences
 
 - Adding a model = drop the folder; picker + scan pick it up. Adding
   expression fidelity = hand-decode its exp3.json into the map.
-- The pointer is only as accurate as the vision chain; locate failures
-  degrade to a spoken "couldn't find it" instead of a wrong point.
+- The pointer is only as accurate as the vision chain; ambiguous screens ask
+  for clarification, while unsupported tasks stop in persona.

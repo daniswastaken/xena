@@ -1,33 +1,33 @@
 /**
  * Router9 connection config.
  * Reads .env from the repo root (walks up from cwd) — no dotenv dep needed.
+ *
+ * Free-only failover: instead of routing to a paid OpenRouter key on 9Router
+ * failures, the chain falls through to other 9Router free-tier models within
+ * the SAME gateway. All requests stay free and on `oc/*` providers.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export interface FallbackProviderConfig {
-  baseUrl: string;
-  apiKey: string;
-  textModel: string;
-  visionModel: string;
-}
-
 export interface Router9Config {
   baseUrl: string;
   apiKey: string;
+  /** Primary text model. */
   textModel: string;
+  /** Primary vision model. */
   visionModel: string;
-  /** Optional failover provider (OpenRouter) — active only when its key is set. */
-  fallback: FallbackProviderConfig | null;
+  /** Free 9Router text models tried in order when the primary fails. */
+  fallbackTextModels: string[];
+  /** Free 9Router vision-capable models (incl. text models that accept images). */
+  fallbackVisionModels: string[];
 }
 
 const DEFAULTS = {
   baseUrl: "http://localhost:20129/v1",
   textModel: "oc/big-pickle",
   visionModel: "oc/x-preview-f-free",
-  fallbackBaseUrl: "https://openrouter.ai/api/v1",
-  fallbackTextModel: "stealth/ox-alpha",
-  fallbackVisionModel: "minimax/minimax-m3:free",
+  fallbackTextModels: ["oc/laguna-s-2.1-free", "oc/mimo-v2.5-free"],
+  fallbackVisionModels: ["oc/mimo-v2.5-free"],
 } as const;
 
 function readDotEnv(): Record<string, string> {
@@ -50,6 +50,14 @@ function readDotEnv(): Record<string, string> {
   return out;
 }
 
+function parseList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 let cached: Router9Config | null = null;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config {
@@ -62,20 +70,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config 
     apiKey,
     textModel: env.XENA_TEXT_MODEL ?? file.XENA_TEXT_MODEL ?? DEFAULTS.textModel,
     visionModel: env.XENA_VISION_MODEL ?? file.XENA_VISION_MODEL ?? DEFAULTS.visionModel,
-    fallback: buildFallback(env, file),
+    fallbackTextModels:
+      parseList(env.XENA_FALLBACK_TEXT_MODELS ?? file.XENA_FALLBACK_TEXT_MODELS) ||
+      [...DEFAULTS.fallbackTextModels],
+    fallbackVisionModels:
+      parseList(env.XENA_FALLBACK_VISION_MODELS ?? file.XENA_FALLBACK_VISION_MODELS) ||
+      [...DEFAULTS.fallbackVisionModels],
   };
   return cached;
-}
-
-function buildFallback(env: NodeJS.ProcessEnv, file: Record<string, string>): FallbackProviderConfig | null {
-  const key = env.OPENROUTER_API_KEY ?? file.OPENROUTER_API_KEY ?? "";
-  if (key.trim() === "") return null;
-  return {
-    baseUrl: (
-      env.OPENROUTER_BASE_URL ?? file.OPENROUTER_BASE_URL ?? DEFAULTS.fallbackBaseUrl
-    ).replace(/\/+$/, ""),
-    apiKey: key,
-    textModel: env.XENA_FALLBACK_TEXT_MODEL ?? file.XENA_FALLBACK_TEXT_MODEL ?? DEFAULTS.fallbackTextModel,
-    visionModel: env.XENA_FALLBACK_VISION_MODEL ?? file.XENA_FALLBACK_VISION_MODEL ?? DEFAULTS.fallbackVisionModel,
-  };
 }

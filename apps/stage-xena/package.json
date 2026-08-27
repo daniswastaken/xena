@@ -9,6 +9,7 @@
     "build": "node build.mjs",
     "dev": "node build.mjs && cross-env XENA_DEV=1 electron .",
     "start": "electron .",
+    "dist": "node build.mjs && electron-builder",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -22,8 +23,27 @@
   "devDependencies": {
     "cross-env": "^10.1.0",
     "electron": "^44.0.0",
+    "electron-builder": "^25.1.8",
     "esbuild": "^0.28.2",
     "typescript": "^5.9.2"
+  },
+  "build": {
+    "appId": "com.xena.app",
+    "productName": "Xena",
+    "executableName": "Xena",
+    "icon": "assets/app-icon.ico",
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "data/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "Xena-setup-${version}.${ext}"
+    }
   }
 }
 

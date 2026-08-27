@@ -26,6 +26,7 @@ export function createAvatarWindow(): { win: BrowserWindow; home: AvatarHome } {
     height: WINDOW_HEIGHT,
     x: home.x,
     y: home.y,
+    icon: join(__dirname, "../renderer/assets/app-icon.png"),
     transparent: true,
     frame: false,
     hasShadow: false,

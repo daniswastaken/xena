@@ -55,45 +55,32 @@ function clearFallbackPenalty(): void {
   fallbackPenaltyUntil = 0;
 }
 
+/**
+ * Chain: primary 9Router model first, then the free 9Router fallback model pool.
+ * All targets hit the same gateway (config.baseUrl) with the same key —
+ * failover is free-to-free within the 9Router free tier, no paid provider.
+ */
 export function buildProviderChain(config: Router9Config, modelOverride?: string): ProviderTarget[] {
   const chain: ProviderTarget[] = [
     { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: modelOverride ?? config.textModel },
   ];
-  if (config.fallback) {
-    chain.push({
-      name: "openrouter",
-      baseUrl: config.fallback.baseUrl,
-      apiKey: config.fallback.apiKey,
-      model: config.fallback.textModel,
-    });
+  for (const model of config.fallbackTextModels) {
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model });
   }
   return chain;
 }
 
 /**
- * Vision chain: router9's vision model first, then the fallback provider's
- * vision model, then its text model (some free text models accept images —
- * probed and cached in docs/vision-models.md).
+ * Vision chain: primary 9Router vision model first, then the free fallback
+ * vision-capable models (including text models that accept images — probed
+ * and cached in docs/vision-models.md). All on the same 9Router gateway.
  */
 export function buildVisionChain(config: Router9Config): ProviderTarget[] {
   const chain: ProviderTarget[] = [
     { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.visionModel },
   ];
-  if (config.fallback) {
-    chain.push({
-      name: "openrouter",
-      baseUrl: config.fallback.baseUrl,
-      apiKey: config.fallback.apiKey,
-      model: config.fallback.visionModel,
-    });
-    if (config.fallback.textModel !== config.fallback.visionModel) {
-      chain.push({
-        name: "openrouter-alt",
-        baseUrl: config.fallback.baseUrl,
-        apiKey: config.fallback.apiKey,
-        model: config.fallback.textModel,
-      });
-    }
+  for (const model of config.fallbackVisionModels) {
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model });
   }
   return chain;
 }
@@ -142,27 +129,47 @@ async function completeOn(
   messages: ChatMessage[],
   options: FailoverChatOptions,
 ): Promise<FailoverResult> {
-  const res = await fetch(`${target.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${target.apiKey}` },
-    body: JSON.stringify({
-      model: target.model,
-      messages,
-      max_tokens: options.maxTokens ?? 512,
-      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-    }),
-    signal: options.signal,
-  });
-  if (!res.ok) throw new Router9Error(res.statusText, res.status, (await res.text()).slice(0, 800));
-  const raw = parseCompletionBody(await res.text());
-  const result = toResult(raw, target.model, target.name);
-  // Upstream can return HTTP 200 with an empty body under load — treat as
-  // transient failure so the next provider gets its chance.
-  if (result.content.trim() === "") {
-    throw new Router9Error("provider returned empty completion", 502, "");
+    const attempt = async (): Promise<FailoverResult> => {
+      const res = await fetch(`${target.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${target.apiKey}` },
+        body: JSON.stringify({
+          model: target.model,
+          messages,
+          max_tokens: options.maxTokens ?? 512,
+          ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+        }),
+        signal: options.signal,
+      });
+      if (!res.ok) throw new Router9Error(res.statusText, res.status, (await res.text()).slice(0, 800));
+      const raw = parseCompletionBody(await res.text());
+      const result = toResult(raw, target.model, target.name);
+      // Upstream can return HTTP 200 with an empty body under load — treat as
+      // transient failure so the next provider gets its chance.
+      if (result.content.trim() === "") {
+        throw new Router9Error("provider returned empty completion", 502, "");
+      }
+      return result;
+    };
+    try {
+      return await attempt();
+    } catch (error) {
+      // Empty completion is a "provider woke up mid-load" blip, not a real
+      // rejection. Share one gateway with the whole chain, so retry the SAME
+      // provider once before bothering the other models — usually succeeds.
+      if (
+        options.signal?.aborted ||
+        !(error instanceof Router9Error) ||
+        error.status !== 502 ||
+        !/empty completion/i.test(error.message)
+      ) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      if (options.signal?.aborted) throw error;
+      return attempt();
+    }
   }
-  return result;
-}
 
 /** Non-streaming completion with automatic provider failover. */
 export async function chatCompleteFailover(

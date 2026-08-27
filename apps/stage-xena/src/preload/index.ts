@@ -32,14 +32,14 @@ export interface XenaApi {
    onLive2d(callback: (config: Live2dConfig) => void): () => void;
    getLive2d(): Promise<Live2dConfig>;
    onSummon(callback: (payload: SummonPayload) => void): () => void;
-   onPointerShow(callback: (payload: { label: string }) => void): () => void;
+    onPointerShow(callback: (payload: { x: number; y: number; label: string; dwellMs: number }) => void): () => void;
+    onPointerHide(callback: () => void): () => void;
    onGaze(callback: (payload: { dx: number; dy: number }) => void): () => void;
    onVoiceRecord(callback: (active: boolean) => void): () => void;
    sendVoiceAudio(base64Wav: string): Promise<string>;
    getStats(): Promise<string>;
    requestChatResize(height: number): void;
    openExternal(url: string): void;
-   pointAt(target: string): Promise<string>;
   noteActivity(): void;
   barDismissed(): void;
   requestBarResize(height: number): void;
@@ -53,7 +53,6 @@ const api: XenaApi = {
    remember: (text) => ipcRenderer.invoke(CHANNELS.remember, text),
    forget: (text) => ipcRenderer.invoke(CHANNELS.forget, text),
   askVision: (question) => ipcRenderer.invoke(CHANNELS.visionAsk, question),
-  pointAt: (target) => ipcRenderer.invoke(CHANNELS.pointAt, target),
   noteActivity: () => ipcRenderer.send(CHANNELS.noteActivity),
   barDismissed: () => ipcRenderer.send(CHANNELS.barDismissed),
   requestBarResize: (height: number) => ipcRenderer.send(CHANNELS.barResize, height),
@@ -99,9 +98,14 @@ const api: XenaApi = {
     return () => ipcRenderer.removeListener(CHANNELS.summonAt, listener);
   },
   onPointerShow: (callback) => {
-    const listener = (_: unknown, payload: { label: string }): void => callback(payload);
+    const listener = (_: unknown, payload: { x: number; y: number; label: string; dwellMs: number }): void => callback(payload);
     ipcRenderer.on(CHANNELS.pointerShow, listener);
     return () => ipcRenderer.removeListener(CHANNELS.pointerShow, listener);
+  },
+  onPointerHide: (callback) => {
+    const listener = (): void => callback();
+    ipcRenderer.on(CHANNELS.pointerHide, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.pointerHide, listener);
   },
   onGaze: (callback) => {
     const listener = (_: unknown, payload: { dx: number; dy: number }): void => callback(payload);

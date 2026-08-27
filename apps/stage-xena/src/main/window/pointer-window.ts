@@ -1,26 +1,29 @@
 /**
- * AI Pointer window: Xena's own cursor — a small transparent always-on-top
- * overlay showing an animated pointer at screen coordinates. Fully
- * click-through, never focusable, auto-hides after a dwell.
+ * AI Pointer window: a transparent overlay covering the target display. The
+ * cursor is a DOM element inside it, glided with CSS transforms
+ * (GPU-composited) instead of per-frame window moves. Fully click-through,
+ * never focusable.
  */
-import { BrowserWindow } from "electron";
+import { BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { CHANNELS } from "../ipc/channels.js";
 
-const SIZE = 72;
 const DWELL_MS = 9000;
+const EXIT_MS = 520;
 
 export class PointerWindow {
   readonly win: BrowserWindow;
+  private readonly ready: Promise<void>;
   private hideTimer: NodeJS.Timeout | null = null;
-  private travelTimer: NodeJS.Timeout | null = null;
 
   constructor() {
+    const b = screen.getPrimaryDisplay().bounds;
     this.win = new BrowserWindow({
-      width: SIZE,
-      height: SIZE,
-      x: -SIZE * 2,
-      y: -SIZE * 2,
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+      icon: join(__dirname, "../renderer/assets/app-icon.png"),
       transparent: true,
       frame: false,
       hasShadow: false,
@@ -41,57 +44,46 @@ export class PointerWindow {
       },
     });
     this.win.setAlwaysOnTop(true, "screen-saver");
-    this.win.loadFile(join(__dirname, "../renderer/pointer.html"));
     this.win.setIgnoreMouseEvents(true);
+    this.ready = this.win.loadFile(join(__dirname, "../renderer/pointer.html"));
   }
 
-  /** Centers the pointer on absolute screen coords, gliding there smoothly. */
-  pointAt(x: number, y: number, label?: string): void {
+  /** Show the cursor at absolute screen coords; renderer glides it there. */
+  async pointAt(x: number, y: number, label?: string, dwellMs = DWELL_MS): Promise<void> {
+    await this.ready;
     if (this.hideTimer) clearTimeout(this.hideTimer);
-    if (this.travelTimer) clearInterval(this.travelTimer);
+    // Cover the display the target lives on. Windows clamps hidden windows to
+    // the work area, so show first, then size to the full display (incl. taskbar).
+    const b = screen.getDisplayNearestPoint({ x, y }).bounds;
     this.win.show();
-    this.win.webContents.send(CHANNELS.pointerShow, { label: label ?? "" });
-
-    // Glide: ease-in-out tween from current position (~420ms, 60fps steps).
-    const from = this.win.getBounds();
-    const startX = from.x;
-    const startY = from.y;
-    const endX = Math.round(x - SIZE / 2);
-    const endY = Math.round(y - SIZE / 2);
-    const dist = Math.hypot(endX - startX, endY - startY);
-    if (dist < 40) {
-      this.win.setPosition(endX, endY, false);
-    } else {
-      const durationMs = Math.min(650, 220 + dist * 0.35);
-      const steps = Math.max(8, Math.round(durationMs / 16));
-      let step = 0;
-      this.travelTimer = setInterval(() => {
-        step++;
-        const t = Math.min(1, step / steps);
-        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // quad in-out
-        this.win.setPosition(
-          Math.round(startX + (endX - startX) * eased),
-          Math.round(startY + (endY - startY) * eased),
-          false,
-        );
-        if (t >= 1) {
-          if (this.travelTimer) clearInterval(this.travelTimer);
-          this.travelTimer = null;
-        }
-      }, 16);
+    const cur = this.win.getBounds();
+    if (cur.x !== b.x || cur.y !== b.y || cur.width !== b.width || cur.height !== b.height) {
+      this.win.setBounds(b);
     }
+    this.win.webContents.send(CHANNELS.pointerShow, {
+      x: x - b.x,
+      y: y - b.y,
+      label: label ?? "",
+      dwellMs,
+    });
+  }
 
+  /** Spin the pointer out after a guided task ends. */
+  finish(): void {
+    if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = setTimeout(() => {
-      this.win.hide();
-      this.hideTimer = null;
-    }, DWELL_MS + Math.min(650, 220 + dist * 0.35));
+      this.win.webContents.send(CHANNELS.pointerHide);
+      this.hideTimer = setTimeout(() => {
+        this.win.hide();
+        this.hideTimer = null;
+      }, EXIT_MS);
+    }, 200);
   }
 
   hide(): void {
     if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = null;
-    if (this.travelTimer) clearInterval(this.travelTimer);
-    this.travelTimer = null;
+    this.win.webContents.send(CHANNELS.pointerHide);
     this.win.hide();
   }
 }

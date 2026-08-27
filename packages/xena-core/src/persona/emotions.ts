@@ -35,35 +35,6 @@ export function extractEmotion(text: string): EmotionParseResult {
   return { clean, emotion };
 }
 
-// --- Point tag protocol -----------------------------------------------------
-
-const POINT_RE = /\[point:\s*([^\]]+)\]/gi;
-
-export interface PointParseResult {
-  /** Text with all point tags removed and trimmed. */
-  clean: string;
-  /** Screen target descriptions in order of appearance. */
-  targets: string[];
-}
-
-export function extractPointTargets(text: string): PointParseResult {
-  const targets: string[] = [];
-  const clean = text
-    .replace(POINT_RE, (_match, captured: string) => {
-      targets.push(captured.trim());
-      return "";
-    })
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-  return { clean, targets };
-}
-
-/** First point target only (convenience for single-step flows). */
-export function extractPointTag(text: string): PointParseResult & { target: string | null } {
-  const { clean, targets } = extractPointTargets(text);
-  return { clean, targets, target: targets[0] ?? null };
-}
-
 // --- Fact tag protocol ------------------------------------------------------
 
 const FACT_RE = /\[fact:\s*([^\]]+)\]/gi;
@@ -87,7 +58,7 @@ export function extractFactTags(text: string): FactParseResult {
   return { clean, facts };
 }
 
-/** Full presentation cleanup: mood tags + point tags + fact tags. */
+/** Full presentation cleanup: mood tags + fact tags. */
 export function cleanForDisplay(text: string): string {
-  return extractFactTags(extractPointTargets(extractEmotion(text).clean).clean).clean;
+  return extractFactTags(extractEmotion(text).clean).clean;
 }

@@ -11,13 +11,11 @@ plain DOM (optional Live2D stage), footprint stays in the ~230 MB range.
 
 ## Features
 
-- **Corner PNGtuber avatar** — sprite states (idle / talk / blink), emotion
-  faces driven by mood tags the model emits, procedural breathing + talk bounce.
-- **Live2D stage (experimental)** — full Live2D model (free Mao sample)
-  with mouth flap synced to speech, per-mood expression variants, gesture
-  motions on emotes, and **gaze tracking** — she watches your cursor and
-  looks where she points. Toggle in the tray; PNG sprites remain the
-  default.
+- **Corner Live2D avatar** — the free Mao Cubism 4 model rendered via
+  pixi.js, with mouth flap synced to speech, per-mood expression variants,
+  gesture motions on emotes, and **gaze tracking** — she watches your cursor
+  and looks where she points. Toggle visibility from the tray (on by default).
+  The old PNG sprite stage was retired.
 - **Chat** — Spotlight-style input bar (Ctrl+Alt+X or shake your cursor);
   replies stream in a comic speech bubble anchored to Xena's head —
   mood-tinted border, thinking dots while she reasons, hover to scroll,
@@ -26,9 +24,9 @@ plain DOM (optional Live2D stage), footprint stays in the ~230 MB range.
 - **Memory** — daily transcripts, nightly in-character diary summaries,
   user-taught facts, keyword+recency recall injected into context. No
   embeddings, no extra inference.
-- **AI Pointer** — ask "how do I search in YouTube?" and Xena's own cursor
-  (pulsing overlay, separate from yours) appears on the target UI element.
-  Vision model locates it; also available as `/point <thing>`.
+- **Guided tasks** — ask "how do I open YouTube?" and Xena's own cursor
+  glides through each visible step. She waits for your screen to change, then
+  captures it again and continues until the task is complete.
 - **Emotions** — replies lead with a mood tag (`[happy] [smug] [surprised]
   [annoyed] [sleepy]`) that drives the avatar's face and Live2D expressions.
 - **Voice** — free Edge read-aloud, mouth synced to audio.
@@ -37,9 +35,9 @@ plain DOM (optional Live2D stage), footprint stays in the ~230 MB range.
   (default OFF) share a one-line observation of what's on screen.
 - **Voice input** — push-to-talk (Ctrl+Alt+V): speak, get transcribed
   through free gpt-audio models, auto-sent as your message.
-- **Provider failover** — 9Router primary; OpenRouter (free `stealth/ox-alpha`,
-  vision via `minimax/minimax-m3:free`) takes over on quota/auth/outage,
-  with a cooldown breaker so outages fail fast. Streams never restart.
+- **Provider failover** — 9Router primary with free `oc/*` fallback models
+  (`oc/laguna-s-2.1-free`, `oc/mimo-v2.5-free`); all targets stay on the same
+  gateway, so never a paid provider. Streams never restart after first token.
 
 ## Controls
 
@@ -48,7 +46,7 @@ plain DOM (optional Live2D stage), footprint stays in the ~230 MB range.
 | Summon bar | `Ctrl+Alt+X` or shake cursor |
 | Dismiss | `Esc` or click away |
 | Screen look | `/look what is this?` |
-| Point at UI | `/point search box` — Xena's own cursor marks it |
+| Guide a task | `How do I open YouTube?` — Xena guides each step interactively |
 | Teach a fact | `/remember my sister's name is Lena` |
 | Drop facts | `/forget lena` |
 | Command list | `/help` |
@@ -80,5 +78,6 @@ pnpm typecheck    # all packages
 node scripts/run-check.mjs scripts/check-recall.ts   # offline core checks
 ```
 
-Configure `.env` (see `.env` keys: `ROUTER9_*`, `OPENROUTER_*`,
-`XENA_FALLBACK_*`, `XENA_TEXT_MODEL`, `XENA_VISION_MODEL`).
+Configure `.env` (see `.env` keys: `ROUTER9_*`,
+`XENA_FALLBACK_TEXT_MODELS`, `XENA_FALLBACK_VISION_MODELS`,
+`XENA_TEXT_MODEL`, `XENA_VISION_MODEL`).

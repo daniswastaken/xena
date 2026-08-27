@@ -20,9 +20,13 @@ export async function askAboutImage(
   question: string,
   dataUrl: string,
   config: Router9Config = loadConfig(),
+  systemPrompt?: string,
 ): Promise<string> {
   const result = await visionCompleteFailover(
-    [buildImageMessage(question, dataUrl)],
+    [
+      ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
+      buildImageMessage(question, dataUrl),
+    ],
     // Vision upstreams are reasoning-style; needs generous token budget.
     { maxTokens: 600 },
     config,

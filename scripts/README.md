@@ -16,7 +16,6 @@ All scripts run from the repo root. Node 24+ (type stripping handles TS).
 | Script | Purpose |
 |---|---|
 | `drive-xena.mjs "msg"` | send a chat message through the real UI |
-| `drive-point.mjs "target"` | fire `/point` at a screen target |
 | `inspect-avatar.mjs` | avatar sprite src + transform + screenshot |
 | `inspect-bar.mjs` | bar answer text + visibility |
 | `inspect-live2d.mjs` | Live2D mount diagnostics (core/canvas) |

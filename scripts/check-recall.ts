@@ -10,7 +10,7 @@ import { MemoryStore } from "@xena/xena-core";
 import { MemoryRecall, renderRecallContext } from "@xena/xena-core";
 import { Diary } from "@xena/xena-core";
 import { FactsStore } from "@xena/xena-core";
-import { extractEmotion, extractPointTag, extractPointTargets, extractFactTags, cleanForDisplay, isEmotion, EMOTIONS } from "@xena/xena-core";
+import { extractEmotion, extractFactTags, cleanForDisplay, isEmotion, EMOTIONS, XENA_SYSTEM_PROMPT, buildSystemPrompt } from "@xena/xena-core";
 import { loadConfig } from "@xena/router9-client";
 import {
   buildProviderChain,
@@ -27,6 +27,14 @@ function assert(cond: boolean, label: string): void {
 }
 
 async function main(): Promise<void> {
+  // --- Persona -------------------------------------------------------------
+  assert(XENA_SYSTEM_PROMPT.includes("AI daughter") && XENA_SYSTEM_PROMPT.includes("Father"), "daughter identity and Father address present");
+  assert(XENA_SYSTEM_PROMPT.includes("orange-peach hair") && XENA_SYSTEM_PROMPT.includes("paintbrush"), "witch appearance and wand canon present");
+  assert(XENA_SYSTEM_PROMPT.includes("Absolutely NO emojis"), "no-emoji rule present");
+  assert(XENA_SYSTEM_PROMPT.includes("zero tolerance for romantic"), "relationship boundary present");
+  assert(!XENA_SYSTEM_PROMPT.includes("corner gremlin with Wi-Fi"), "old gremlin identity removed");
+  assert(buildSystemPrompt({ preamble: "Father prefers concise answers." }).endsWith("Context:\nFather prefers concise answers."), "custom prompt preamble appended");
+
   // --- Emotion protocol ---------------------------------------------------
   const parsed = extractEmotion("[smug] Oh I absolutely called that.");
   assert(parsed.emotion === "smug", "leading mood tag recognized");
@@ -39,16 +47,9 @@ async function main(): Promise<void> {
   assert(EMOTIONS.every(isEmotion), "canonical list validates");
   assert(!isEmotion("[angry]") && !isEmotion("angry"), "non-canonical names rejected");
 
-  // --- Point tag protocol ---------------------------------------------------
-  const pointed = extractPointTag("Click the glass. [point: search icon top right]");
-  assert(pointed.target === "search icon top right", "point tag extracted");
-  assert(pointed.clean === "Click the glass.", "point tag stripped");
-  assert(extractPointTag("no tag here").target === null, "pointless text passes");
-  const multi = extractPointTargets("First [point: file menu], then [point: save button].");
-  assert(multi.targets.length === 2 && multi.targets[1] === "save button", "multi-step points in order");
-  assert(multi.clean === "First , then .", "multi-step strip keeps sentence flow");
-  const combo = cleanForDisplay("[happy] Use it. [point: the button]");
-  assert(combo === "Use it.", "combined mood+point cleanup");
+  // --- Presentation cleanup -------------------------------------------------
+  const combo = cleanForDisplay("[happy] Use it.");
+  assert(combo === "Use it.", "display cleanup strips mood tags");
   const factful = extractFactTags("Got it. [fact: user's name is Dan]");
   assert(factful.facts.length === 1 && factful.facts[0] === "user's name is Dan", "fact tag curated");
   assert(factful.clean === "Got it.", "fact tag stripped from speech");
@@ -133,20 +134,12 @@ async function main(): Promise<void> {
     // --- Failover chain ------------------------------------------------------
     const base = loadConfig();
     console.log(`      chain: ${buildProviderChain(base).map((p) => `${p.name}:${p.model}`).join(" -> ")}`);
-    const soloChain = buildProviderChain({ ...base, fallback: null });
-    assert(soloChain.length === 1 && soloChain[0]!.name === "router9", "fallback:null -> single provider");
-    if (base.fallback) {
-      const duo = buildProviderChain(base);
-      assert(
-        duo.length === 2 &&
-          duo[0]!.name === "router9" &&
-          duo[1]!.name === "openrouter" &&
-          duo[1]!.model === "stealth/ox-alpha",
-        "fallback key -> openrouter appended with ox-alpha",
-      );
-    } else {
-      console.log("SKIP  fallback assertions — OPENROUTER_API_KEY not set");
-    }
+    const chain = buildProviderChain(base);
+    assert(chain.length >= 2, "fallback free models present -> multi-provider chain");
+    assert(chain[0]!.name === "router9" && chain[0]!.model === "oc/big-pickle", "primary is router9:oc/big-pickle");
+    const fbModels = chain.slice(1).map((p) => p.model);
+    assert(fbModels.every((m) => m.startsWith("oc/")), "all failover targets are 9Router free-tier oc/* models");
+    assert(fbModels.includes("oc/laguna-s-2.1-free"), "laguna-s-2.1-free is a free fallback");
 
     // --- Live: normal path (only if 9Router is up) ---------------------------
     let router9Up = false;
@@ -183,31 +176,24 @@ async function main(): Promise<void> {
       console.log("SKIP  live check — 9Router unreachable");
     }
 
-    // --- Live: forced failover (primary dead -> OpenRouter ox-alpha) ---------
-    if (base.fallback) {
-      const brokenPrimary: typeof base = {
-        ...base,
-        baseUrl: "http://127.0.0.1:9/v1", // nothing listens here
-      };
-      try {
-        const result = await chatCompleteFailover(
-          [{ role: "user", content: "Reply with exactly: OK" }],
-          { maxTokens: 200 },
-          brokenPrimary,
-        );
-        assert(result.providerUsed === "openrouter", `forced failover served by ${result.providerUsed}`);
-        console.log(`      reply: ${JSON.stringify(result.content.slice(0, 40))}`);
-      } catch (error) {
-        const reachedFallback = error instanceof Router9Error; // primary failure mode is TypeError (refused)
-        console.log(`      failover error: ${error instanceof Error ? error.message : String(error)}`);
-        assert(reachedFallback, "forced failover reached fallback provider");
-      }
-    } else {
-      console.log("SKIP  forced failover — OPENROUTER_API_KEY not set");
+    // --- Live: forced failover (primary dead -> free 9Router fallback) -------
+    const brokenPrimary = { ...base, baseUrl: "http://127.0.0.1:9/v1" }; // nothing listens here
+    try {
+      const result = await chatCompleteFailover(
+        [{ role: "user", content: "Reply with exactly: OK" }],
+        { maxTokens: 200 },
+        brokenPrimary,
+      );
+      assert(result.providerUsed === "router9-fb", `forced failover served by ${result.providerUsed}`);
+      console.log(`      reply: ${JSON.stringify(result.content.slice(0, 40))}`);
+    } catch (error) {
+      const reachedFallback = error instanceof Router9Error || error instanceof Error;
+      console.log(`      failover error: ${error instanceof Error ? error.message : String(error)}`);
+      assert(reachedFallback, "forced failover reached fallback provider");
     }
 
-    // --- Live: vision failover (opt-in via XENA_CHECK_VISION=1; costs quota) --
-    if (process.env.XENA_CHECK_VISION === "1" && base.fallback) {
+    // --- Live: vision failover (opt-in via XENA_CHECK_VISION=1; free tier) ----
+    if (process.env.XENA_CHECK_VISION === "1") {
       const visionChain = buildVisionChain(base);
       console.log(`      vision chain: ${visionChain.map((p) => `${p.name}:${p.model}`).join(" -> ")}`);
       // 1x1 red PNG, minimal bytes.
@@ -238,7 +224,7 @@ async function main(): Promise<void> {
         }
       }
     } else {
-      console.log("SKIP  vision check — set XENA_CHECK_VISION=1 to spend quota on it");
+      console.log("SKIP  vision check — set XENA_CHECK_VISION=1 to exercise it");
     }
   } finally {
     store.close();

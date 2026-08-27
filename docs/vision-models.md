@@ -42,6 +42,9 @@ Same test image. Goal: vision-capable fallback for when 9Router is out of quota.
 ## Verdict (update)
 
 - Primary vision: `oc/x-preview-f-free` via 9Router (unchanged).
-- Fallback vision: **`minimax/minimax-m3:free`** via OpenRouter
-  (`.env`: `XENA_FALLBACK_VISION_MODEL`), then `stealth/ox-alpha` as last resort.
+- Fallback vision: `oc/mimo-v2.5-free` via 9Router free tier
+  (`.env`: `XENA_FALLBACK_VISION_MODELS`, comma-separated `oc/*` ids).
+  Previous OpenRouter fallbacks removed — chain lives on 9Router free pool.
+- Vision failover chain also ends with `oc/laguna-s-2.1-free` (9Router's
+  auto-routing model, accepts images) as a last resort.
 - Wired via `visionCompleteFailover` / `buildVisionChain` in `packages/router9-client`.

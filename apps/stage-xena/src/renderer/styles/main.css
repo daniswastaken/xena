@@ -26,18 +26,7 @@ body {
   user-select: none;
 }
 
-/* Avatar pinned bottom-right; window itself is fully click-through. */
-#avatar {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  pointer-events: none;
-  transform-origin: 50% 100%;
-  will-change: transform;
-}
-
+/* Avatar (Live2D canvas) pinned bottom-right; window is click-through. */
 #live2d-root {
   position: absolute;
   right: 0;

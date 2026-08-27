@@ -38,6 +38,7 @@ export class BarWindow {
       height: BAR_IDLE_HEIGHT,
       x: this.home.x,
       y: this.home.y,
+      icon: join(__dirname, "../renderer/assets/app-icon.png"),
       transparent: true,
       frame: false,
       hasShadow: false,

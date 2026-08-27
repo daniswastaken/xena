@@ -12,8 +12,13 @@ Separately, sessions rotate daily, so yesterday's facts were unreachable.
 ## Decisions
 
 1. **Provider chain** (`packages/router9-client/src/chat/failover.ts`)
-   - Primary: 9Router (`ROUTER9_*`). Fallback: OpenRouter `stealth/ox-alpha`
-     (`OPENROUTER_API_KEY` in `.env`; absent key => single-provider chain).
+   - Primary: 9Router (`ROUTER9_*`) with `oc/big-pickle` (chat) and
+     `oc/x-preview-f-free` (vision). Failover: additional free-tier 9Router
+     models via `XENA_FALLBACK_TEXT_MODELS` / `XENA_FALLBACK_VISION_MODELS`
+     (comma-separated `oc/*` ids). All targets hit the same 9Router gateway —
+     no paid provider keys in the chain.
+   - Verified free fallback chat models: `oc/laguna-s-2.1-free`,
+     `oc/mimo-v2.5-free`.
    - Failover triggers: 401/402/403/404/408/429/5xx, network refusal,
      HTTP-200-with-empty-body (upstream load).
    - Streams never restart after the first emitted token (no duplicated text).

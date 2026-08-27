@@ -57,8 +57,8 @@ await esbuild.build({
 
 await esbuild.build({
   ...common,
-  entryPoints: [join(root, "src/renderer/bar.ts")],
-  outfile: join(dist, "renderer/bar.js"),
+  entryPoints: [join(root, "src/renderer/pointer.ts")],
+  outfile: join(dist, "renderer/pointer.js"),
   platform: "browser",
   format: "iife",
 });

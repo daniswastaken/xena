@@ -3,18 +3,17 @@
  * Renderer never fetches directly — everything goes through here.
  */
 import { ipcMain, Notification } from "electron";
-import { screen } from "electron";
 import { access, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Session } from "@xena/xena-core";
 import { MemoryStore } from "@xena/xena-core";
 import { Diary } from "@xena/xena-core";
 import { FactsStore } from "@xena/xena-core";
-import { extractEmotion, extractPointTargets, extractFactTags, buildSystemPrompt } from "@xena/xena-core";
+import { extractEmotion, extractFactTags, buildSystemPrompt } from "@xena/xena-core";
 import { askAboutImage, chatCompleteFailover, type Router9Config } from "@xena/router9-client";
 import { CHANNELS } from "./channels.js";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
-import { locateOnScreen } from "../pointer/locate.js";
+import { GuidedTask, looksLikeGuidedTask } from "../pointer/guided-task.js";
 import { transcribeAudio } from "../voice-input/transcribe.js";
 import type { PointerWindow } from "../window/pointer-window.js";
 import { speakReply } from "../tts/speak.js";
@@ -52,11 +51,10 @@ export function registerIpcHandlers(
   gaze?: { lookAtPoint: (x: number, y: number, holdMs?: number) => void },
 ): void {
   let currentSessionId = todaySessionId();
-  let currentModel = "";
+  let guidedTask: GuidedTask | null = null;
 
   function openSession(): Promise<Session> {
     return settings.get().then(({ textModel }) => {
-      currentModel = textModel;
       return Session.open(
         {
           sessionId: currentSessionId,
@@ -108,7 +106,7 @@ export function registerIpcHandlers(
           {
             role: "user",
             content:
-              "This is the very first time we meet. Say ONE short friendly intro (max 12 words) — you just moved into the corner of my screen.",
+              "This is the very first time we meet. Say ONE short friendly intro (max 12 words) — you just woke up as a witch sprite in Father's screen corner.",
           },
         ],
         { maxTokens: 300, temperature: 1.0 },
@@ -179,6 +177,32 @@ export function registerIpcHandlers(
       avatarWin().webContents.send(CHANNELS.chatDone, true);
       return;
     }
+    if (looksLikeGuidedTask(trimmed)) {
+      const task = new GuidedTask(config, pointer ?? (() => { throw new Error("pointer unavailable"); })() as PointerWindow, {
+        send: (reply) => avatarWin().webContents.send(CHANNELS.chatToken, reply),
+        sendDone: () => avatarWin().webContents.send(CHANNELS.chatDone, true),
+        emote: (mood) => avatarWin().webContents.send(CHANNELS.avatarEmote, mood),
+        speak: (reply, mood) => maybeSpeak(reply, mood),
+        append: async (role, content) => {
+          const session = await getSession();
+          await session.append({ role, content });
+        },
+      });
+      if (!pointer) throw new Error("pointer unavailable");
+      guidedTask = task;
+      scheduler.setBusy(true);
+      avatarWin().webContents.send(CHANNELS.chatThinking, true);
+      void task.run(trimmed).catch((error: unknown) => {
+        avatarWin().webContents.send(CHANNELS.chatThinking, false);
+        avatarWin().webContents.send(CHANNELS.chatError, error instanceof Error ? error.message : String(error));
+        avatarWin().webContents.send(CHANNELS.chatDone, true);
+      }).finally(() => {
+        if (guidedTask === task) guidedTask = null;
+        scheduler.setBusy(false);
+        avatarWin().webContents.send(CHANNELS.chatThinking, false);
+      });
+      return;
+    }
     if (trimmed === "/stats") {      const session = await getSession();
       const msgs = session.history().filter((m) => m.role !== "system").length;
       const facts = await new FactsStore(join(DATA_DIR, "facts.json")).listAll();
@@ -227,32 +251,12 @@ export function registerIpcHandlers(
       avatarWin().webContents.send(CHANNELS.chatDone, true);
       // Reading time scales with the answer: 8s base + 20ms/char (max +20s).
       const { clean, emotion } = extractEmotion(reply);
-      const { clean: afterPoints, targets } = extractPointTargets(clean);
-      const { clean: speakable, facts } = extractFactTags(afterPoints);
+      const { clean: speakable, facts } = extractFactTags(clean);
       avatarWin().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
       // Model-curated memory: [fact: ...] tags persist to the facts store.
       if (facts.length > 0) {
         const factsStore = new FactsStore(join(DATA_DIR, "facts.json"));
-        void Promise.all(facts.slice(0, 2).map((f) => factsStore.add(f))).catch(() => undefined);
-      }
-      // Natural-language pointing: [point: target] tags fire the AI Pointer
-      // in sequence after the reply lands; locate failures stay silent.
-      // Mao glances at whatever she points at.
-      if (targets.length > 0 && pointer) {
-        const { bounds } = screen.getPrimaryDisplay();
-        targets.slice(0, 3).forEach((target, step) => {
-          setTimeout(() => {
-            void locateOnScreen(target, config)
-              .then((coords) => {
-                if (!coords) return;
-                const px = bounds.x + coords.x * bounds.width;
-                const py = bounds.y + coords.y * bounds.height;
-                pointer!.pointAt(px, py, target);
-                gaze?.lookAtPoint(px, py);
-              })
-              .catch(() => undefined);
-          }, step * 4500);
-        });
+        void factsStore.add(facts[0]!).catch(() => undefined);
       }
       await maybeSpeak(speakable, emotion ?? undefined);
     } finally {
@@ -261,6 +265,7 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle(CHANNELS.chatAbort, async () => {
+    guidedTask?.cancel();
     const session = await sessionReady;
     session.abort();
   });
@@ -307,8 +312,8 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle(CHANNELS.live2dGet, async () => {
-    const { live2dEnabled, live2dModel } = await settings.get();
-    return { enabled: live2dEnabled, model: live2dModel || "hiyori" };
+    const { avatarEnabled, live2dModel } = await settings.get();
+    return { enabled: avatarEnabled, model: live2dModel || "hiyori" };
   });
 
   ipcMain.handle(CHANNELS.voiceTranscribe, async (_event, audio: unknown) => {
@@ -335,41 +340,6 @@ export function registerIpcHandlers(
     bar.hide();
   });
 
-  ipcMain.handle(CHANNELS.pointAt, async (_event, target: unknown) => {
-    if (typeof target !== "string" || target.trim() === "") throw new Error("empty target");
-    const wanted = target.trim();
-    scheduler.noteActivity();
-    // Bubble dots while the vision model locates — unless a stream owns it.
-    const free = !scheduler.isBusy();
-    if (free) avatarWin().webContents.send(CHANNELS.chatThinking, true);
-    const coords = await locateOnScreen(wanted, config);
-    if (!coords) {
-      if (free) {
-        avatarWin().webContents.send(CHANNELS.chatThinking, false);
-        avatarWin().webContents.send(CHANNELS.chatToken, `I looked but couldn't find "${wanted}" on your screen.`);
-        avatarWin().webContents.send(CHANNELS.chatDone, true);
-      }
-      return `I looked but couldn't find "${wanted}" on your screen.`;
-    }
-    if (pointer) {
-      // Capture covers the FULL display (incl. taskbar) — map with bounds,
-      // not workArea, or points land clipped above the taskbar.
-      const { bounds } = screen.getPrimaryDisplay();
-      const px = bounds.x + coords.x * bounds.width;
-      const py = bounds.y + coords.y * bounds.height;
-      pointer.pointAt(px, py, wanted);
-      gaze?.lookAtPoint(px, py);
-    }
-    const reply = `Right here — I'm pointing at ${wanted}.`;
-    // Mid-stream, the chat window is busy with the real reply — pointer
-    // still fires, but we don't clobber the stream or the busy state.
-    if (!scheduler.isBusy()) {
-            avatarWin().webContents.send(CHANNELS.chatToken, reply);
-      avatarWin().webContents.send(CHANNELS.chatDone, true);
-    }
-    return reply;
-  });
-
   ipcMain.handle(CHANNELS.visionAsk, async (_event, question: unknown) => {
     const q =
       typeof question === "string" && question.trim() !== ""
@@ -381,25 +351,35 @@ export function registerIpcHandlers(
     const dataUrl = await getScreenCapture();
     let answer: string;
     try {
-      answer = await askAboutImage(q, dataUrl, config);
+      answer = await askAboutImage(q, dataUrl, config, buildSystemPrompt());
     } catch (err) {
       if (free) avatarWin().webContents.send(CHANNELS.chatThinking, false);
       throw err;
     }
+    const { clean, emotion } = extractEmotion(answer.trim());
+    const { clean: speakable, facts } = extractFactTags(clean);
     // Vision Q&A joins the transcript — "what did you see earlier?" works.
+    // Keep mood metadata for conversational continuity.
     try {
       const session = await getSession();
       await session.append({ role: "user", content: `[shared screen] ${q}` });
-      await session.append({ role: "assistant", content: answer });
+      await session.append({
+        role: "assistant",
+        content: emotion ? `[${emotion}] ${speakable}` : speakable,
+      });
     } catch {
       // memory persistence is best-effort
     }
+    avatarWin().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
+    if (facts.length > 0) {
+      void new FactsStore(join(DATA_DIR, "facts.json")).add(facts[0]!).catch(() => undefined);
+    }
     if (!scheduler.isBusy()) {
-            avatarWin().webContents.send(CHANNELS.chatToken, answer);
+      avatarWin().webContents.send(CHANNELS.chatToken, speakable);
       avatarWin().webContents.send(CHANNELS.chatDone, true);
     }
-    await maybeSpeak(extractEmotion(answer).clean);
-    return answer;
+    await maybeSpeak(speakable, emotion ?? undefined);
+    return speakable;
   });
 }
 

@@ -8,8 +8,8 @@ export interface XenaSettings {
   voiceEnabled: boolean;
   proactiveEnabled: boolean;
   shakeEnabled: boolean;
-  /** experimental Live2D stage (pixi) instead of PNG sprites */
-  live2dEnabled: boolean;
+  /** avatar (Live2D stage) visible in the corner overlay */
+  avatarEnabled: boolean;
   /** folder name under assets/live2d/; empty = first available */
   live2dModel: string;
   /** launch Xena when Windows starts */
@@ -28,7 +28,7 @@ const DEFAULTS: XenaSettings = {
   voiceEnabled: true,
   proactiveEnabled: true,
   shakeEnabled: true,
-  live2dEnabled: false,
+  avatarEnabled: true,
   live2dModel: "",
   autostartEnabled: false,
   ttsVoice: "",

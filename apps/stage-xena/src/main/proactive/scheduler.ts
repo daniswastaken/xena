@@ -16,9 +16,9 @@ const COOLDOWN_MS = Number(process.env.XENA_TEST_IDLE_MS) || 45 * 60_000;
 const QUIET_HOURS = { start: 23, end: 8 }; // [23:00, 08:00) = silent
 
 const IDLE_PROMPTS = [
-  "The user has been away from the chat a while. Say ONE short idle remark (max 12 words) — an observation, a nudge, or a tiny question. No emoji spam.",
-  "It's been quiet for a while. Say ONE brief playful comment (max 12 words) as the corner gremlin. Vary your tone.",
-  "Long silence. Offer ONE short thought or gentle check-in (max 12 words).",
+  "Father has been away from the chat a while. Say ONE short daughterly remark (max 12 words): a caring nudge, observation, or tiny question. No emojis.",
+  "It has been quiet for a while. Say ONE brief playful comment (max 12 words) as his eager witch daughter. Vary your tone.",
+  "Long silence. Offer Father ONE short caring thought or gentle check-in (max 12 words).",
 ];
 
 function timeOfDay(hour: number): string {

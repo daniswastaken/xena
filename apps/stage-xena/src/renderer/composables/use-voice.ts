@@ -1,6 +1,5 @@
 /**
- * Voice playback: plays TTS mp3, drives the mouth for the duration.
- * Accepts any mouth facade (PNG flap, Live2D stage, or both).
+ * Voice playback: plays TTS mp3, drives the Live2D mouth for the duration.
  */
 export interface Mouth {
   start(): void;

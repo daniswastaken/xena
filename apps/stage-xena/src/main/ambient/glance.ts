@@ -7,6 +7,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { visionCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { buildSystemPrompt, extractEmotion, extractFactTags } from "@xena/xena-core";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
 
@@ -25,7 +26,7 @@ export class GlanceTimer {
     private readonly config: Router9Config,
     private readonly isEnabled: () => Promise<boolean>,
     private readonly isBusy: () => boolean,
-    private readonly onSpeak: (text: string) => Promise<void>,
+    private readonly onSpeak: (text: string, mood?: string) => Promise<void>,
     private readonly diaryDir?: string,
   ) {}
 
@@ -49,6 +50,7 @@ export class GlanceTimer {
       const dataUrl = await captureScreenDataUrl();
       const result = await visionCompleteFailover(
         [
+          { role: "system", content: buildSystemPrompt() },
           {
             role: "user",
             content: [
@@ -60,10 +62,12 @@ export class GlanceTimer {
         { maxTokens: 300 },
         this.config,
       );
-      const observation = result.content.trim();
+      const { clean, emotion } = extractEmotion(result.content.trim());
+      const { clean: observation } = extractFactTags(clean);
       if (observation === "") return;
       this.getWindow().webContents.send(CHANNELS.chatProactive, observation);
-      await this.onSpeak(observation);
+      this.getWindow().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
+      await this.onSpeak(observation, emotion ?? undefined);
       // Observations become memory: appended to the day's diary so recall
       // can surface them later ("what was on my screen earlier?").
       if (this.diaryDir) {

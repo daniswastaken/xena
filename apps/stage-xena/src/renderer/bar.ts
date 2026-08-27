@@ -122,7 +122,7 @@ function friendlyError(message: string): string {
 const HELP_TEXT = [
   "Commands:",
   "/look <question> — share your screen and ask about it",
-  "/point <thing> — I'll point at it on your screen",
+  "Ask how to do something and I'll guide you step by step on screen",
   "/remember <fact> — I'll keep this permanently",
   "/forget <keyword> — drop matching facts",
   "/stats — today's conversation stats",
@@ -215,7 +215,7 @@ async function submit(raw: string): Promise<void> {
     return;
   }
 
-  // /look and /point results display in the chat window (main broadcasts).
+  // /look results display in the chat window (main broadcasts).
 
   // Streaming paths: the bar gets out of the way — the bubble takes over
   // with the animated dots. Instant commands below keep the bar visible.
@@ -224,8 +224,6 @@ async function submit(raw: string): Promise<void> {
   try {
     if (text.startsWith("/look")) {
       await xena.askVision(text.slice(5).trim() || "What am I looking at?");
-    } else if (text.startsWith("/point ")) {
-      await xena.pointAt(text.slice(7));
     } else {
       await xena.sendChat(text);
     }

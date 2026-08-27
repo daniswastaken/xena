@@ -63,7 +63,7 @@ The companion release. Xena gains a full Live2D rig, screen pointing,
 durable memory, and emotional prosody.
 
 ### Avatar
-- Live2D stage (experimental, tray toggle): free Mao sample model with
+- Live2D avatar (sole avatar, tray toggle): free Mao sample model with
   per-mood expression alternates, TapBody gesture motions, vowel
   lip-sync (A/I/U/E/O), organic blinking, neutral resets, jittered flap
 - Gaze tracking: eyes + head follow the cursor; she glances at her own

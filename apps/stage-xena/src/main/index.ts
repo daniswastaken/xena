@@ -31,6 +31,11 @@ function scanLive2dModels(baseDir: string): string[] {
   }
 }
 
+// Rebrand: present as "Xena" (not bare Electron) in the OS shell, taskbar
+// grouping, and process metadata.
+app.setName("Xena");
+app.setAppUserModelId("com.xena.app");
+
 // Weak iGPU target: keep Chromium from spawning extra GPU processes when possible.
 app.commandLine.appendSwitch("disable-gpu-sandbox");
 // Suppress noisy AMD DirectComposition error from child GPU process.
@@ -144,7 +149,7 @@ let gaze: GazeTracker | null = null;
     );
     const gazeInstance = new GazeTracker(
       () => avatar,
-      async () => (await settings.get()).live2dEnabled,
+      async () => (await settings.get()).avatarEnabled,
     );
     gazeInstance.start();
     gaze = gazeInstance;
@@ -155,10 +160,10 @@ let gaze: GazeTracker | null = null;
       config,
       async () => (await settings.get()).ambientEnabled,
       () => scheduler.isBusy(),
-      async (observation) => {
+      async (observation, mood) => {
         const { voiceEnabled, ttsVoice } = await settings.get();
         if (!voiceEnabled) return;
-        const audio = await speakReply(observation, ttsVoice || undefined).catch(() => null);
+        const audio = await speakReply(observation, ttsVoice || undefined, mood).catch(() => null);
         if (audio) avatar.webContents.send("tts:audio", audio);
       },
       join(process.cwd(), "data", "diary"),
@@ -174,13 +179,13 @@ let gaze: GazeTracker | null = null;
 
     const live2dModels = scanLive2dModels(join(__dirname, "../renderer/assets/live2d"));
     const pushLive2d = (): void => {
-      void settings.get().then(({ live2dEnabled, live2dModel }) => {
+      void settings.get().then(({ avatarEnabled, live2dModel }) => {
         const model = live2dModel || live2dModels[0] || "hiyori";
-        avatar.webContents.send("avatar:live2d", { enabled: live2dEnabled, model });
+        avatar.webContents.send("avatar:live2d", { enabled: avatarEnabled, model });
       });
     };
 
-    createTray(bar, join(__dirname, "../renderer/assets"), settings, config.textModel, {
+    createTray(bar, join(__dirname, "../renderer/assets"), settings, {
       live2dModels,
       onLive2dChange: pushLive2d,
     });

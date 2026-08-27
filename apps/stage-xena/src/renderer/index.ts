@@ -1,10 +1,8 @@
 /**
- * Avatar renderer: sprite states + TTS-synced mouth flap + mood emotes.
- * Fully passive — the main process decides everything.
+ * Avatar renderer: the Live2D stage (Mao) with TTS-synced mouth flap,
+ * cursor gaze, and mood expressions. The main process decides everything;
+ * the renderer is fully passive.
  */
-import { MouthFlap } from "./modules/avatar/mouth-flap.js";
-import { EmoteStage } from "./modules/avatar/emotes.js";
-import { Liveliness } from "./modules/avatar/liveliness.js";
 import { Live2DStage } from "./modules/avatar/live2d/stage.js";
 import { initVoice } from "./composables/use-voice.js";
 import { xena } from "./composables/use-xena-api.js";
@@ -19,39 +17,20 @@ import {
   armAutoFade,
 } from "./modules/avatar/bubble.js";
 
-const stage = new EmoteStage({
-  idle: "./assets/idle.png",
-  talk: "./assets/talk.png",
-  blink: "./assets/blink.png",
-});
-void stage.preload();
-
-const flap = new MouthFlap(stage);
-const liveliness = new Liveliness(() => flap.state === "talking");
-liveliness.start();
-
-// --- Live2D (experimental, tray-toggled) -----------------------------------
-const avatarImg = document.getElementById("avatar") as HTMLImageElement;
 const live2dRoot = document.getElementById("live2d-root") as HTMLElement;
 let l2d: Live2DStage | null = null;
 let l2dModelDir = "";
 
-function showPng(): void {
-  live2dRoot.style.display = "none";
-  avatarImg.style.display = "";
-  liveliness.start();
-}
-
 async function applyLive2d(enabled: boolean, model: string): Promise<void> {
-  // Convention: folder "hiyori" -> hiyori/Hiyori.model3.json.
+  // Convention: folder "mao" -> mao/Mao.model3.json.
   const pascal = model.charAt(0).toUpperCase() + model.slice(1);
   const modelDir = `./assets/live2d/${model}/${pascal}.model3.json`;
   if (!enabled) {
     if (l2d !== null) {
       l2d.destroy();
       l2d = null;
-      showPng();
     }
+    live2dRoot.style.display = "none";
     return;
   }
   if (l2d !== null && l2dModelDir === modelDir) return;
@@ -60,18 +39,16 @@ async function applyLive2d(enabled: boolean, model: string): Promise<void> {
     l2d.destroy();
     l2d = null;
   }
-  liveliness.stop();
   l2d = new Live2DStage(modelDir);
   l2dModelDir = modelDir;
   live2dRoot.style.display = "block";
-  avatarImg.style.display = "none";
   try {
     await l2d.mount(live2dRoot);
   } catch (error) {
     console.error("[live2d] mount failed:", error);
     l2d.destroy();
     l2d = null;
-    showPng();
+    live2dRoot.style.display = "none";
   }
 }
 
@@ -81,38 +58,39 @@ void xena
   .then((config) => void applyLive2d(config.enabled, config.model))
   .catch(() => undefined);
 
-// Voice drives both the PNG flap and the Live2D mouth simultaneously;
-// whichever stage is visible reacts. While SHE talks, she holds eye
-// contact instead of following the cursor — turn-taking gaze.
 let ttsPlaying = false;
 initVoice({
   start: () => {
-    flap.start();
     ttsPlaying = true;
     l2d?.setGaze(0, 0);
     l2d?.setTalking(true);
   },
   stop: () => {
-    flap.stop();
     ttsPlaying = false;
     l2d?.setTalking(false);
   },
 });
 
-// Mood tags from replies drive the face; on decay return to whatever
-// state the flap logic is currently in and drop the face to neutral.
+// Mood tags from replies drive Mao's face; on decay she returns to neutral.
+let currentEmotion = "";
+let emotionResetTimer: number | null = null;
 xena.onEmote((emotion) => {
+  currentEmotion = emotion;
   setMood(emotion);
-  stage.setEmotion(emotion, () => {
-    if (flap.state === "idle") flap.stop();
-    else flap.start();
-    l2d?.resetExpression();
-  });
-  // Live2D: mood flourish (expression + motion).
-  if (emotion !== "" && l2d?.ready) l2d.playMoodFlourish(emotion);
+  l2d?.setMood(emotion);
+  if (emotionResetTimer !== null) {
+    window.clearTimeout(emotionResetTimer);
+    emotionResetTimer = null;
+  }
+  if (emotion !== "") {
+    emotionResetTimer = window.setTimeout(() => {
+      emotionResetTimer = null;
+      currentEmotion = "";
+    }, 12_000);
+  }
 });
 
-// Mao watches the user's cursor (Live2D only) — unless she's talking.
+// Mao watches the user's cursor — unless she's talking.
 xena.onGaze(({ dx, dy }) => {
   if (!ttsPlaying) l2d?.setGaze(dx, dy);
 });
@@ -147,32 +125,18 @@ xena.onProactive((text) => {
   armAutoFade();
 });
 
-// Random blinks while idle.
-const scheduleBlink = (): void => {
-  window.setTimeout(() => {
-    flap.blinkOnce();
-    scheduleBlink();
-  }, 2400 + Math.random() * 4200);
-};
-scheduleBlink();
-
-// Occasional unprompted mood flickers while idle — she has moods even
-// when nobody is talking to her. Sometimes it's just a stretch/gesture
-// with no face change at all.
-const IDLE_EMOTES = ["happy", "smug", "sleepy"];
+// Occasional unprompted mood flickers / gestures while idle — she has
+// moods even when nobody is talking to her.
+const IDLE_MOODS = ["happy", "smug", "sleepy"];
 const scheduleIdleEmote = (): void => {
   window.setTimeout(() => {
-    if (flap.state === "idle" && stage.emotion === null) {
-      if (Math.random() < 0.45 && l2d?.ready) {
+    if (l2d?.ready && !ttsPlaying && currentEmotion === "") {
+      if (Math.random() < 0.45) {
         // gesture-only beat: motion, face stays neutral
         l2d.playIdleGesture();
       } else {
-        const mood = IDLE_EMOTES[Math.floor(Math.random() * IDLE_EMOTES.length)]!;
-        stage.setEmotion(mood, () => {
-          if (flap.state === "idle") flap.stop();
-          l2d?.resetExpression();
-        });
-        if (l2d?.ready) l2d.playMoodFlourish(mood);
+        const mood = IDLE_MOODS[Math.floor(Math.random() * IDLE_MOODS.length)]!;
+        l2d.setMood(mood);
       }
     }
     scheduleIdleEmote();
