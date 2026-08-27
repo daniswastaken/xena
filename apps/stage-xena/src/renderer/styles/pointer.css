@@ -35,12 +35,12 @@ body {
 
 .cursor-svg {
   position: absolute;
-  left: -4.5px;
-  top: -3.6px;
-  width: 44px;
+  left: -2.2px;
+  top: -1.8px;
+  width: 22px;
   height: auto;
   pointer-events: none;
-  transform-origin: 4.5px 3.6px;
+  transform-origin: 2.2px 1.8px;
 }
 
 .ripple {

@@ -12,4 +12,5 @@ export {
   type ProviderTarget,
 } from "./chat/failover.js";
 export { askAboutImage, buildImageMessage, imageDataUrl } from "./vision/ask.js";
+export { geminiVision } from "./vision/gemini.js";
 export { listModels, isVisionCapable } from "./models/registry.js";

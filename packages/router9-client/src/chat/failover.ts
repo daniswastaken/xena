@@ -1,8 +1,8 @@
 /**
  * Provider failover for chat completions.
  * Primary: 9Router. Fallback: OpenRouter (free tier) when the primary is
- * out of quota, unauthenticated, or unreachable. Streaming restarts from
- * scratch on the fallback only if no token was emitted yet.
+ * out of quota, unreachable. Streaming restarts from scratch on the fallback
+ * only if no token was emitted yet.
  */
 import type { Router9Config } from "../config.js";
 import {
@@ -11,12 +11,15 @@ import {
   type ChatMessage,
 } from "../types.js";
 import { chatComplete, parseCompletionBody } from "./completions.js";
+import { geminiVision } from "../vision/gemini.js";
 
 export interface ProviderTarget {
   name: string;
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** OpenAI-compatible (9Router) vs native Gemini vision adapter. */
+  kind: "openai" | "gemini";
 }
 
 export interface FailoverChatOptions {
@@ -62,10 +65,10 @@ function clearFallbackPenalty(): void {
  */
 export function buildProviderChain(config: Router9Config, modelOverride?: string): ProviderTarget[] {
   const chain: ProviderTarget[] = [
-    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: modelOverride ?? config.textModel },
+    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: modelOverride ?? config.textModel, kind: "openai" },
   ];
   for (const model of config.fallbackTextModels) {
-    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model });
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai" });
   }
   return chain;
 }
@@ -77,10 +80,15 @@ export function buildProviderChain(config: Router9Config, modelOverride?: string
  */
 export function buildVisionChain(config: Router9Config): ProviderTarget[] {
   const chain: ProviderTarget[] = [
-    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.visionModel },
+    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.visionModel, kind: "openai" },
   ];
+  // Gemini (separate free pool) as the first vision fallback — usually more
+  // reliable than 9Router's free mimo model.
+  if (config.geminiApiKey) {
+    chain.push({ name: "gemini", baseUrl: "", apiKey: "", model: config.geminiVisionModel, kind: "gemini" });
+  }
   for (const model of config.fallbackVisionModels) {
-    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model });
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai" });
   }
   return chain;
 }
@@ -177,7 +185,7 @@ export async function chatCompleteFailover(
   options: FailoverChatOptions,
   config: Router9Config,
 ): Promise<FailoverResult> {
-  return completeWalk(buildProviderChain(config, options.model), messages, options);
+  return completeWalk(buildProviderChain(config, options.model), messages, options, config);
 }
 
 /** Non-streaming vision completion with automatic provider failover. */
@@ -186,20 +194,22 @@ export async function visionCompleteFailover(
   options: FailoverChatOptions,
   config: Router9Config,
 ): Promise<FailoverResult> {
-  return completeWalk(buildVisionChain(config), messages, options);
+  return completeWalk(buildVisionChain(config), messages, options, config);
 }
 
 async function completeWalk(
   chain: ProviderTarget[],
   messages: ChatMessage[],
   options: FailoverChatOptions,
+  config: Router9Config,
 ): Promise<FailoverResult> {
   let lastError: unknown;
   for (let i = 0; i < chain.length; i++) {
     const target = chain[i]!;
     if (i > 0 && fallbackUnderPenalty()) break; // breaker open — fail fast
     try {
-      const result = await completeOn(target, messages, options);
+      const result =
+        target.kind === "gemini" ? await geminiVision(messages, options, config) : await completeOn(target, messages, options);
       if (i > 0) clearFallbackPenalty();
       return result;
     } catch (error) {

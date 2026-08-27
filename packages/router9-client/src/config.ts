@@ -20,6 +20,10 @@ export interface Router9Config {
   fallbackTextModels: string[];
   /** Free 9Router vision-capable models (incl. text models that accept images). */
   fallbackVisionModels: string[];
+  /** Google AI Studio free Gemini key — vision fallback only, separate free pool. */
+  geminiApiKey: string | null;
+  /** Gemini vision model id (e.g. gemini-flash-latest). */
+  geminiVisionModel: string;
 }
 
 const DEFAULTS = {
@@ -28,6 +32,7 @@ const DEFAULTS = {
   visionModel: "oc/x-preview-f-free",
   fallbackTextModels: ["oc/laguna-s-2.1-free", "oc/mimo-v2.5-free"],
   fallbackVisionModels: ["oc/mimo-v2.5-free"],
+  geminiVisionModel: "gemini-flash-latest",
 } as const;
 
 function readDotEnv(): Record<string, string> {
@@ -76,6 +81,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config 
     fallbackVisionModels:
       parseList(env.XENA_FALLBACK_VISION_MODELS ?? file.XENA_FALLBACK_VISION_MODELS) ||
       [...DEFAULTS.fallbackVisionModels],
+    geminiApiKey: env.XENA_GEMINI_API_KEY ?? file.XENA_GEMINI_API_KEY ?? null,
+    geminiVisionModel: env.XENA_GEMINI_VISION_MODEL ?? file.XENA_GEMINI_VISION_MODEL ?? DEFAULTS.geminiVisionModel,
   };
   return cached;
 }

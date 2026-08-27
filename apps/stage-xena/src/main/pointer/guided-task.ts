@@ -127,7 +127,7 @@ Use continue when the user must perform another visible action. Use done only wh
             ],
           },
         ],
-        { maxTokens: 300, signal: AbortSignal.timeout(60_000) },
+        { maxTokens: 700, signal: AbortSignal.timeout(60_000) },
         this.config,
       );
       return parseGuidedPlan(result.content);
@@ -156,7 +156,7 @@ Use continue when the user must perform another visible action. Use done only wh
               ],
             },
           ],
-          { maxTokens: 160, signal: AbortSignal.timeout(45_000) },
+          { maxTokens: 400, signal: AbortSignal.timeout(45_000) },
           this.config,
         );
         const coords = parseCoords(result.content, bounds.width, bounds.height);

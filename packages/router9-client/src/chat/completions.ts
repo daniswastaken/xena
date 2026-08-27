@@ -27,10 +27,15 @@ function extractContent(raw: RawResponse): string {
 }
 
 /**
- * Router9 sometimes appends SSE frames (e.g. "data: [DONE]") even to
- * non-streaming bodies — parse defensively.
+ * Router9 sometimes returns an SSE stream (data: frames) even to
+ * non-streaming requests — parse defensively. When the body IS a stream,
+ * merge every frame so first-frame-empty responses don't lose real content.
  */
 export function parseCompletionBody(text: string): RawResponse {
+  if (text.trimStart().startsWith("data:")) {
+    const merged = parseSseFrames(text);
+    if (merged) return merged;
+  }
   try {
     return JSON.parse(text) as RawResponse;
   } catch {
@@ -57,6 +62,51 @@ export function parseCompletionBody(text: string): RawResponse {
       throw new Router9Error("unparseable response body", 502, text.slice(0, 300));
     }
   }
+}
+
+/** Merge all data: frames of an SSE body into a single completion response. */
+function parseSseFrames(text: string): RawResponse | null {
+  const frames: Array<{
+    id?: string;
+    model?: string;
+    choices?: Array<{
+      finish_reason?: string | null;
+      message?: { content?: string | null; reasoning_content?: string | null };
+      delta?: { content?: string | null; reasoning_content?: string | null };
+    }>;
+  }> = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t.startsWith("data:")) continue;
+    const payload = t.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      frames.push(JSON.parse(payload) as (typeof frames)[number]);
+    } catch {
+      // keep-alive noise between events
+    }
+  }
+  if (frames.length === 0) return null;
+  let content = "";
+  let reasoning = "";
+  let finish: string | null = null;
+  const first = frames[0]!;
+  const out: RawResponse = { id: first.id ?? "", model: first.model ?? "" };
+  for (const frame of frames) {
+    const ch = frame.choices?.[0];
+    if (!ch) continue;
+    if (typeof ch.finish_reason === "string") finish = ch.finish_reason;
+    const deltaContent = ch.delta?.content;
+    const msgContent = ch.message?.content;
+    if (typeof deltaContent === "string" && deltaContent) content += deltaContent;
+    else if (typeof msgContent === "string") content = msgContent;
+    const deltaReasoning = ch.delta?.reasoning_content;
+    const msgReasoning = ch.message?.reasoning_content;
+    if (typeof deltaReasoning === "string" && deltaReasoning) reasoning += deltaReasoning;
+    else if (typeof msgReasoning === "string") reasoning = msgReasoning;
+  }
+  out.choices = [{ message: { content, reasoning_content: reasoning || null }, finish_reason: finish }];
+  return out;
 }
 
 export async function chatComplete(
