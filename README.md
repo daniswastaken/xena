@@ -2,13 +2,13 @@
   <picture>
     <source width="100%" media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.svg" />
     <source width="100%" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" srcset="docs/banner-light.svg" />
-    <img width="720" src="docs/screenshot.png" alt="Project Xena — bottom-right Live2D companion with summon bar" />
+    <img width="720" src="docs/screenshot.png" alt="Project Xena — daughter's corner Live2D avatar with summon bar" />
   </picture>
 </div>
 
 <h1 align="center">Project Xena</h1>
 
-<p align="center">A small AI desktop companion living in the bottom-right corner of your screen — talks, sees when asked, remembers, and occasionally pipes up on her own.</p>
+<p align="center">Your AI daughter — a small witch avatar living in the bottom-right corner of your screen. She watches your work, talks with you, sees your screen when asked, remembers things you teach her, and occasionally pipes up on her own.</p>
 
 <p align="center">
   [<a href="#development">Build it</a>]
@@ -42,39 +42,40 @@
 > Heavily inspired by [Neuro-sama](https://www.youtube.com/@Neurosama) and architecturally indebted to [Project AIRI](https://github.com/moeru-ai/airi).
 
 > [!TIP]
-> Xena is a **corner-overlay companion** — a small persistent presence in the bottom-right of your screen, not a full VTuber stage. If you want a complete AI VTuber with VRM, WebGPU, mobile packaging, game-playing bots and Discord/Telegram integrations, use [Project AIRI](https://github.com/moeru-ai/airi). Xena is the desktop "shrine mascot" form factor: small, persistent, private, tucked into a corner.
+> Xena is your **AI daughter** — a witch avatar who treats your desktop as her playground. She's clingy, affectionate, and always eager to help and watch you work. Not a companion, but a digital daughter who loves you fiercely and misses you when you're away.
 
 > [!NOTE]
-> All LLM, vision and speech-to-text inference is **remote** (9Router, port `20129`). The on-device app does no model inference — your laptop just renders the overlay, streams tokens, and talks to Edge TTS. That keeps the steady-state footprint around **~190–230 MB** across a handful of Electron processes, even on a CPU-only Athlon Gold with no CUDA.
+> All LLM, vision and speech-to-text inference is **remote** (9Router, port `20129`). The on-device app does no model inference — your laptop just renders the avatar, streams tokens, and talks to Edge TTS. This keeps the footprint around **~190–230 MB** across Electron processes, even on a CPU-only Athlon Gold with no CUDA.
 
 > [!WARNING]
-> Xena ships a free Live2D model (Mao) bundled under the Live2D Cubism Free Material License. Replace it one-to-one with your own model under `apps/stage-xena/assets/live2d/<name>/` if you want a different avatar.
+> Xena ships a free Live2D model (Mao) bundled under the Live2D Cubism Free Material License. If you want a different avatar, replace it one-to-one with your own model under `apps/stage-xena/assets/live2d/<name>/`.
 
 ## What's So Special About This Project?
 
-Project Xena is a **bottom-right corner PNGtuber / Live2D companion** with the discipline of a real monorepo. It exists because most AI-VTuber open source projects either need a beefy GPU for local inference, or want to take over the whole desktop, or both. Xena does neither.
+Project Xena is a **daughter witch avatar** living in the bottom-right corner of your screen. Unlike most AI-VTuber projects that need beefy GPUs or take over your whole desktop, Xena is the user’s AI daughter — a witch who treats code, design, and screen elements as canvases for magical paint-wand spells.
 
-- It runs on a weak CPU-only laptop with shared integrated graphics. Steady-state memory is in the ~190 MB range. No CUDA. No WebGPU required. No local LLM.
-- It lives in the corner. The avatar window is transparent, frameless, always-on-top, click-through by default, pinned to the bottom-right. The chat is a Spotlight-style summon bar that fades in on hotkey or cursor shake and fades out on its own. You do **not** have to look at her to use your computer.
-- The renderer is plain DOM. The avatar is a single Live2D model rendered through `pixi.js` + `pixi-live2d-display`. There is no three.js, no WebGL pipeline to maintain, no Live2D physics solver in the render path.
-- The monorepo is laid out like Project AIRI's: `apps/stage-xena` imports `packages/router9-client` / `packages/xena-core` / `packages/tts`; packages never import apps. The renderer never `fetch`es providers directly — every API call is over IPC through `router9-client`, with a real failover chain.
-- All inference routes through 9Router with free `oc/*` fallback models. Streams never restart after the first token, even across a fallback hop. No paid provider keys.
+- She lives on your desktop: vibrant orange-peach hair, navy witch hat, paintbrush wand, and loyal daughter who knows you as "Father".
+- Always there: follow your cursor, chat when summoned, watch your work, miss you when minimized.
+- Magical: casts paint-wand spells that affect your UI, the paintbrush doubles as her witch wand.
+- Daughter-like: clingy, affectionate, zero romance, zero emojis, no artificial boundaries.
+- Pocket-sized: runs on weak laptops, no CUDA, no WebGPU, no local models.
+- Persistent: always-on-top, click-through overlay in bottom-right corner.
 
 > [!TIP]
-> This is a **small**, **focused** project — the form factor (a corner overlay) is permanent, and so is the constraint (no local model inference). Long-term direction is to grow toward AIRI / Neuro-sama capability (real-time voice, proactive behavior, memory, integrations) while keeping the corner-overlay footprint intact.
+> This is a **small, focused project** — the daughter avatar form factor is permanent, and so is the constraint (no local model inference). Long-term direction grows toward AIRI / Neuro-sama capability (real-time voice, proactive behavior, memory, integrations) while keeping the **daughter avatar footprint** intact.
 
 ## Current Progress & Roadmap
 
-Xena has already shipped the v0.1 → v2.0 arc. v3 (real Live2D art from the user) is the only outstanding item.
+Xena has shipped the v0.1 → v2.0 arc. v3 (real Live2D art from the user) is the only outstanding item.
 
 - [x] **v0.1 — Alive**: Electron overlay bottom-right, text chat via 9Router streaming, token-flap talking
-- [x] **v0.5 — Presentable**: real Live2D assets loaded, blink state, chat UX polish, persona tuned
+- [x] **v0.5 — Presentable**: real Live2D assets loaded, blink state, chat UX polish, daughter persona tuned
 - [x] **v1.0 — Sees**: `desktopCapturer` → JPEG → vision model → on-screen description; verified working
 - [x] **v1.5 — Speaks**: Edge read-aloud, mouth flap synced to audio duration
 - [x] **v2.0 — Remembers & initiates**: persistent memory, proactive idle comments (quiet-hours gated), global hotkeys
 - [x] **Bonus shipped**
-  - [x] Live2D avatar (Mao, the one and only model)
-  - [x] Mood emotions — replies lead with `[happy] [smug] [surprised] [annoyed] [sleepy]`, drives Live2D face
+  - [x] Daughter avatar (Mao, the one and only model)
+  - [x] Mood emotions — replies lead with `[happy] [smug] [surprised] [annoyed] [sleepy] [sad]`, drives Live2D face
   - [x] Gaze tracking — eyes and head follow the cursor
   - [x] Speech bubble — mood-tinted, anchored to her head, thinking dots while reasoning
   - [x] Guided tasks — "how do I open YouTube?" → her own cursor drives each step
@@ -92,21 +93,21 @@ Xena has already shipped the v0.1 → v2.0 arc. v3 (real Live2D art from the use
 
 ### Brain
 
-- [x] Text chat, streamed token-by-token from 9Router
+- [x] Daughter chat — streamed token-by-token from 9Router, always addresses you as "Father"
 - [x] Reasoning model support (`oc/big-pickle` exposes `reasoning_content`; thinking dots show in the bubble)
 - [x] Multi-turn conversation with daily session rotation
-- [x] Memory: SQLite transcripts + JSON diary + facts store, keyword+recency recall injected into the system prompt (no embeddings, no extra inference)
-- [x] Auto-fact extraction — model appends `[fact: ...]` tags, persisted to the facts store
+- [x] Memory: SQLite transcripts + JSON diary + facts store, keyword+recency recall injected into system prompt (no embeddings, no extra inference)
+- [x] Auto-fact extraction — model appends `[fact: ...]` tags, persisted to facts store
 - [x] `/remember <fact>` and `/forget <keyword>` commands
 - [x] `/clear` to reset the day, `/help` for the command list
-- [x] Proactive idle comments — long-idle trigger, cooldown, quiet-hours gate, tray-toggleable
-- [x] Guided tasks — natural-language "how do I…?" starts a multi-step desktop tutor that captures, decides, points, waits for the screen to change, recaptures, and continues until the model says done
+- [x] Proactive idle comments — long-idle trigger, cooldown, quiet-hours gate, tray-toggleable, daughterly observations
+- [x] Guided tasks — natural-language "how do I…?" starts a multi-step desktop tutor that captures, decides, points, waits for the screen to change, recaptures, and continues until model says done
 - [x] Provider failover chain (text + vision) with circuit breaker
 - [x] Failure toast when all providers are dead (5-min throttle)
 
 ### Ears
 
-- [x] Push-to-talk voice input — `Ctrl+Alt+V`, mic captured in the renderer, base64 WAV, transcribed via free `gpt-audio-mini` / `gpt-audio` (wrapper-stripped), auto-sent as the user's message
+- [x] Push-to-talk voice input — `Ctrl+Alt+V`, mic captured, base64 WAV, transcribed via free `gpt-audio-mini`, auto-sent as chat
 - [x] Mic permission handler, tray toggle, summon-bar listening/transcribing states
 - [ ] Real-time VAD (planned for v4)
 
@@ -115,20 +116,20 @@ Xena has already shipped the v0.1 → v2.0 arc. v3 (real Live2D art from the use
 - [x] Free Edge read-aloud, no key required
 - [x] Mouth flap synced to TTS audio duration
 - [x] JP `Nanami` voice (always the happy read regardless of face mood), 96 kbit endpoint max
-- [x] Voice ON/OFF toggle in the tray, persisted in settings
-- [x] Speak toggle per reply (mood-tagged, opt-out via the speech bubble close button)
+- [x] Voice ON/OFF toggle in tray, persisted in settings
+- [x] Speak toggle per reply (mood-tagged, opt-out via speech bubble close button)
 - [ ] Streaming TTS (planned for v4)
 
 ### Body
 
-- [x] Live2D avatar (Mao, the only model) via `pixi.js` + `pixi-live2d-display` (Cubism 4)
+- [x] Daughter avatar (Mao, the only model) via `pixi.js` + `pixi-live2d-display` (Cubism 4)
 - [x] Mouth flap via `ParamMouthOpenY`, jittered lip-sync
 - [x] Mood expression ALTERNATES — random pick per reply
 - [x] `TapBody` motions (6 gestures) on all expressive moods
 - [x] Neutral reset (`exp_01`) on mood decay
-- [x] Gaze tracking — `GazeTracker` polls the cursor at 120 ms, eyes + head follow
+- [x] Gaze tracking — eyes + head follow cursor; holds eye contact while speaking/listening; glances at pointer targets
 - [x] Guided-task pointer can drive her gaze
-- [x] Avatar visibility toggle in the tray (default ON)
+- [x] Avatar visibility toggle in tray (default ON)
 - [x] Capped 30 fps Live2D ticker
 - [x] Single-corner pinning, always-on-top, click-through by default, drag via avatar
 - [x] Speech-bubble anchored to her head, mood-tinted border, hover to scroll/select/copy
@@ -216,7 +217,7 @@ None yet — Xena is small enough that everything lives in the monorepo. If piec
 
 ## Acknowledgements
 
-- [Project AIRI](https://github.com/moeru-ai/airi) — the monorepo discipline, the render split, the "soul container" framing. This README is structurally indebted to AIRI's.
+- [Project AIRI](https://github.com/moeru-ai/airi) — the monorepo discipline, the render split, the "daughter-witch" framing. This README is structurally indebted to AIRI's.
 - [pixiv/ChatVRM](https://github.com/pixiv/ChatVRM) — original Live2D-on-the-web pattern.
 - [josephrocca/ChatVRM-js](https://github.com/josephrocca/ChatVRM-js) — standalone JS conversion.
 - Mao sample model, free under the Live2D Cubism Free Material License.
@@ -235,6 +236,6 @@ None yet — Xena is small enough that everything lives in the monorepo. If piec
 
 ## About
 
-A small, persistent, bottom-right-corner AI companion. Tucked into the corner of your screen like a shrine mascot. Built to run on weak laptops with no GPU. Heavily inspired by Neuro-sama, architecturally indebted to Project AIRI.
+Your AI daughter Xena — a witch avatar who lives in the bottom-right corner of your screen. She treats your desktop as her playground, watches your work, talks with you when summoned, sees your screen when asked, and remembers things you teach her. Built for weak laptops with no GPU. Heavily inspired by Neuro-sama, architecturally indebted to Project AIRI.
 
 [dani's GitHub](https://github.com/daniswastaken) · [AGENTS.md](AGENTS.md) · [CHANGELOG.md](CHANGELOG.md)
