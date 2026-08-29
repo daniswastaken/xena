@@ -3,7 +3,7 @@
  * Copies index.html + assets into dist. No dev server — reload Electron to see changes.
  */
 import * as esbuild from "esbuild";
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -68,6 +68,15 @@ cpSync(join(root, "src/renderer/bar.html"), join(dist, "renderer/bar.html"));
 cpSync(join(root, "src/renderer/pointer.html"), join(dist, "renderer/pointer.html"));
 cpSync(join(root, "src/renderer/styles"), join(dist, "renderer/styles"), { recursive: true });
 cpSync(join(root, "assets"), join(dist, "renderer/assets"), { recursive: true });
+
+// Bundle 9Router into dist/resources/9router/ for dev runs (mirrors what
+// electron-builder copies into the packaged .exe's resources folder at
+// install time). Lets NineRouterChild spawn the bundled copy via
+// process.resourcesPath without requiring npm-global 9router on PATH.
+const srcRouter = join(root, "node_modules/9router");
+if (existsSync(srcRouter)) {
+  cpSync(srcRouter, join(dist, "resources/9router"), { recursive: true });
+}
 
 console.log("build ok ->", dist);
 

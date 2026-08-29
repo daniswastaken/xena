@@ -18,6 +18,7 @@
     "@xena/router9-client": "workspace:*",
     "@xena/tts": "workspace:*",
     "@xena/xena-core": "workspace:*",
+    "9router": "^0.5.55",
     "pixi-live2d-display": "^0.4.0",
     "pixi.js": "^6.5.10"
   },
@@ -36,7 +37,14 @@
     "files": [
       "dist/**/*",
       "assets/**/*",
-      "data/**/*"
+      "vendor/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/9router",
+        "to": "9router",
+        "filter": ["**/*"]
+      }
     ],
     "directories": {
       "output": "release"

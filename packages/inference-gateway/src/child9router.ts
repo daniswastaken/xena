@@ -10,9 +10,15 @@
  * If 9Router is ALREADY serving on the port at boot (user's manual
  * instance, or a leftover), it is adopted instead of double-spawning.
  *
+ * Spawn resolution:
+ *   1. Bundled copy under `resources/9router/` when packaged.
+ *   2. PATH-resolved `9router` (dev / npm-global) otherwise.
+ *
  * Electron-free: pure Node, unit-testable outside the app.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { InferenceConfig } from "./config.js";
 
 export interface ChildEvents {
@@ -27,6 +33,22 @@ const PROBE_TIMEOUT_MS = 5_000;
 const RESPAWN_BACKOFF_START_MS = 5_000;
 const RESPAWN_BACKOFF_CAP_MS = 30_000;
 const RESPAWN_MAX_ATTEMPTS = 5;
+
+/** Resolve a spawn spec for 9Router. Returns [cmd, args, useShell]. */
+function resolveSpawnSpec(): { cmd: string; args: string[]; shell: boolean; env?: Record<string, string> } | null {
+  // Packaged: resources/9router/cli.js. Run it with the Electron-bundled
+  // Node via ELECTRON_RUN_AS_NODE so no system Node is required.
+  const resourcesRoot = (process as unknown as { resourcesPath?: string }).resourcesPath;
+  if (resourcesRoot) {
+    const bundled = join(resourcesRoot, "9router", "cli.js");
+    if (existsSync(bundled)) {
+      return { cmd: process.execPath, args: [bundled], shell: false, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } };
+    }
+  }
+  // Dev: 9router resolved via PATH (npm global). shell:true for Windows
+  // PATHEXT resolution of the .cmd shim npm creates.
+  return { cmd: "9router", args: [], shell: true };
+}
 
 export class NineRouterChild {
   private child: ChildProcess | null = null;
@@ -94,11 +116,18 @@ export class NineRouterChild {
   private spawnChild(): void {
     if (this.disposed || this.child) return;
     this.setState("starting");
+    const spec = resolveSpawnSpec();
+    if (!spec) {
+      this.scheduleRespawn();
+      return;
+    }
     let child: ChildProcess;
     try {
-      // `9router` resolves via PATH (npm global). shell:true for Windows
-      // PATHEXT resolution of the .cmd shim npm creates.
-      child = spawn("9router", this.spawnArgs(), { shell: true, stdio: "ignore" });
+      child = spawn(spec.cmd, [...spec.args, ...this.spawnArgs()], {
+        shell: spec.shell,
+        stdio: "ignore",
+        env: spec.env,
+      });
     } catch {
       this.scheduleRespawn();
       return;
