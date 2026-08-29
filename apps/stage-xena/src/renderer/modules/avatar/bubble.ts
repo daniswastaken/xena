@@ -19,7 +19,16 @@ function setInteractive(on: boolean): void {
   if (on === interactiveNow) return;
   interactiveNow = on;
   xena.setClickThrough(on);
-  copyBtn.classList.toggle("hidden", !on || textEl.textContent === "");
+  copyBtn.classList.toggle("hidden", !on || textEl.textContent === "" || setupActive);
+}
+
+/** Setup mode disables copy/interactivity on the bubble.
+ *  During setup the setup UI is pointer-interactive but the copy button stays hidden. */
+let setupActive = false;
+export function setSetupActive(on: boolean): void {
+  setupActive = on;
+  if (on) copyBtn.classList.add("hidden");
+  else copyBtn.classList.toggle("hidden", !interactiveNow || textEl.textContent === "");
 }
 
 /** Bring the bubble on stage, cancelling any in-flight exit animation. */
@@ -39,9 +48,16 @@ export function showBubble(text: string, isError = false): void {
   bubble.classList.remove("thinking");
   nameEl.classList.remove("hidden");
   reasonEl.classList.add("hidden");
-  if (effective !== "") presentBubble();
+  if (effective !== "") {
+    presentBubble();
+    // Restart the entrance animation every line so switching dialogue/audio
+    // fades in smoothly instead of snapping instantly.
+    bubble.style.animation = "none";
+    void bubble.offsetWidth; /* force reflow to re-run the keyframes */
+    bubble.style.animation = "";
+  }
   else bubble.classList.add("hidden");
-  copyBtn.classList.toggle("hidden", !interactiveNow || effective === "");
+  copyBtn.classList.toggle("hidden", setupActive || !interactiveNow || effective === "");
   textEl.scrollTop = textEl.scrollHeight;
 }
 
@@ -150,10 +166,13 @@ copyBtn.addEventListener("click", () => {
   });
 });
 
-// Hover-interactivity over the bubble only.
+// Hover-interactivity: the bubble surface and the setup UI (yes/no buttons + key input).
+// During setup, the setup UI is pointer-interactive but the copy button stays hidden.
 document.addEventListener("mousemove", (event) => {
   const target = event.target as Element | null;
-  setInteractive(target !== null && (bubble.contains(target) || target === copyBtn));
+  if (setupActive) return; // Setup mode: disable all interactivity (buttons handle themselves).
+  const inBubble = target !== null && (bubble.contains(target) || target === copyBtn);
+  setInteractive(Boolean(inBubble));
   if (interactiveNow) {
     // Scrolling keeps the bubble alive.
     if (autoFadeTimer !== null) armAutoFade();

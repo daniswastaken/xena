@@ -16,6 +16,8 @@ export interface XenaSettings {
   ambientEnabled: boolean;
   /** oc/* model id; empty = default from .env */
   textModel: string;
+  /** user-provided Gemini API key (optional — chain runs keyless without) */
+  geminiApiKey: string;
 }
 
 const DEFAULTS: XenaSettings = {
@@ -26,6 +28,7 @@ const DEFAULTS: XenaSettings = {
   autostartEnabled: false,
   ambientEnabled: false,
   textModel: "",
+  geminiApiKey: "",
 };
 
 export class SettingsStore {

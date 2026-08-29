@@ -1,8 +1,10 @@
 /**
  * Xena main process entry.
  */
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 import { app, globalShortcut } from "electron";
 import { join } from "node:path";
+import { dataDir } from "./paths.js";
 import { createAvatarWindow } from "./window/overlay.js";
 import { BarWindow } from "./window/bar-window.js";
 import { PointerWindow } from "./window/pointer-window.js";
@@ -17,6 +19,8 @@ import { speakReply } from "./tts/speak.js";
 import { ShakeDetector } from "./input/shake-detector.js";
 import { GazeTracker } from "./input/gaze-tracker.js";
 import { GlanceTimer } from "./ambient/glance.js";import { CHANNELS } from "./ipc/channels.js";
+import { ipcMain } from "electron";
+import { SetupFlow } from "./setup/setup.js";
 
 /** The one and only Live2D model directory name (Mao). */
 const LIVE2D_MODEL = "mao";
@@ -29,7 +33,7 @@ app.setAppUserModelId("com.xena.app");
 // Weak iGPU target: keep Chromium from spawning extra GPU processes when possible.
 app.commandLine.appendSwitch("disable-gpu-sandbox");
 app.commandLine.appendSwitch("log-level", "3");
-app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
 // Suppress noisy AMD DirectComposition error from child GPU process.
 process.env.ELECTRON_ENABLE_LOGGING = "0";
 process.env.ELECTRON_ENABLE_STACK_DUMPING = "0";
@@ -42,7 +46,7 @@ if (!gotLock) {
   app.quit();
 } else {
   const config = loadInferenceConfig();
-  const settings = new SettingsStore(defaultSettingsPath(join(process.cwd(), "data")));
+  const settings = new SettingsStore(defaultSettingsPath(dataDir()));
 
   let bar: BarWindow | null = null;
   let shake: ShakeDetector | null = null;
@@ -50,20 +54,50 @@ if (!gotLock) {
   // Xena owns the 9Router gateway now: spawn with the app, kill with it.
   let nineRouter: NineRouterChild | null = null;
 
+  let setupActive = false;
   app.on("second-instance", () => {
     bar?.summonCorner();
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     const { win: avatar } = createAvatarWindow();
     bar = new BarWindow(() => void maybeGreetBack());
 
-    // Unified launch: inference comes up with Xena. Gemini/Pollinations are
-    // plain HTTPS (instantly up); the 9Router child is spawned + supervised.
+    // First-run setup flow. All UI lives in the avatar window — bar stays hidden
+    // until the flow finishes (or is skipped on non-first-run).
+    const setup = new SetupFlow(avatar, settings, config, () => {
+      // onDone is the only place we start the scheduler — whether first run or not.
+      // For non-first-run, called immediately by setup.start().
+      setupActive = false;
+      avatar.setIgnoreMouseEvents(true, { forward: true });
+      scheduler.start();
+    });
+    // Wire IPC before starting setup.
+    ipcMain.on(CHANNELS.setupSubmit, (_e, text: unknown) => {
+      if (typeof text === "string") setup.onInput(text);
+    });
+    ipcMain.on(CHANNELS.setupBack, () => setup.onBack());
+    ipcMain.on(CHANNELS.setupAudioEnd, () => setup.onAudioEnd());
+    // 9Router child is independent of setup — start it now.
     nineRouter = new NineRouterChild(config, {
       onState: (state) => console.log(`[inference] 9router child: ${state}`),
     });
     nineRouter.start();
+    // Begin setup logic — resolves firstRun and calls onDone for non-first-run.
+    const firstRun = await setup.start();
+    if (firstRun) {
+      setupActive = true;
+      // Setup needs the yes/no + key input clickable — temporarily lift
+      // click-through from the avatar window so its DOM receives mouse events.
+      avatar.setIgnoreMouseEvents(false);
+    }
+    // Wait for the avatar page to fully load before firing the greeting so its
+    // setup listeners are subscribed before the first IPC arrives.
+    avatar.webContents.on("did-finish-load", () => {
+      avatar.webContents.send(CHANNELS.setupBegin);
+      setup.sendStep("greeting");
+      setup.sendBubble("Oh, Father! You're looking for me? Eh, you have something to give?", "surprised");
+    });
 
     // Welcome-back: after 30+ min away, greet on corner summon (max 1/10min).
     let lastGreetAt = 0;
@@ -124,8 +158,8 @@ if (!gotLock) {
       },
       async () => {
         // Flavor idle comments with a memory fragment about the last topic.
-        const dataDir = join(process.cwd(), "data");
-        const store = new MemoryStore(dataDir);
+        const dir = dataDir();
+        const store = new MemoryStore(dir);
         const sessions = await store.listAll();
         const latest = sessions
           .sort((a, b) => (b.meta?.updatedAt ?? "").localeCompare(a.meta?.updatedAt ?? ""))
@@ -134,7 +168,7 @@ if (!gotLock) {
           .reverse()
           .find((m) => m.role === "user");
         if (!latest || !lastUser || typeof lastUser.content !== "string") return "";
-        const hits = await new MemoryRecall(store, join(dataDir, "diary")).recall(
+        const hits = await new MemoryRecall(store, join(dir, "diary")).recall(
           lastUser.content,
           { excludeSessionId: latest.meta?.id, topK: 2 },
         );
@@ -159,7 +193,7 @@ if (!gotLock) {
         const audio = await speakReply(observation, mood).catch(() => null);
         if (audio) avatar.webContents.send("tts:audio", audio);
       },
-      join(process.cwd(), "data", "diary"),
+      join(dataDir(), "diary"),
     );
     void glances;
     // Unified initiative clock: every 5-7 min either an ambient glance or
@@ -169,6 +203,7 @@ if (!gotLock) {
 
     shake = new ShakeDetector((x, y) => {
       void settings.get().then(({ shakeEnabled }) => {
+        if (setupActive) return;
         if (shakeEnabled) bar?.summonAtCursor(x, y);
       });
     });
@@ -219,4 +254,5 @@ if (!gotLock) {
     // Tray app: keep running unless user quits from tray.
   });
 }
+
 

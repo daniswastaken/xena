@@ -28,6 +28,17 @@ export const CHANNELS = {
   barDismissed: "bar:dismissed",
   barResize: "bar:resize",
   noteActivity: "activity:note",
+  setupBegin: "setup:begin",
+  setupBubble: "setup:bubble",
+  setupMood: "setup:mood",
+  setupStep: "setup:step",
+  setupSubmit: "setup:submit",
+  setupBack: "setup:back",
+  setupDone: "setup:done",
+  avatarReady: "avatar:ready",
+  barReady: "bar:ready",
+  setupActive: "setup:active",
+  setupAudioEnd: "setup:audio-end",
 } as const;
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS];

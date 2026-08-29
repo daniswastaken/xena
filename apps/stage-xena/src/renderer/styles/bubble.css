@@ -8,6 +8,7 @@
   max-width: 380px;
   min-width: 80px;
   overflow: visible;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   padding: 14px 16px;
@@ -21,7 +22,7 @@
   word-break: break-word;
   text-shadow: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  animation: bubble-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: bubble-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #bubble.hidden {
@@ -194,4 +195,90 @@
 }
 #bubble[data-mood="sleepy"] {
   background: #222830;
+}
+
+/* Setup UI: lives under the bubble during first-run only.
+   Positioned via top/right (computed by index.ts after the bubble renders)
+   so it always sits flush below the bubble's right edge.
+   Same z-index as the bubble so they stack at the same layer. */
+#setup-ui {
+  position: absolute;
+  right: 178px;
+  top: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: auto;
+  z-index: 10;
+}
+#setup-ui.hidden {
+  display: none;
+}
+
+#setup-choices {
+  display: flex;
+  gap: 10px;
+}
+#setup-choices button {
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #dde4ea;
+  background: #1a2c38;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 8px 24px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, transform 80ms;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  min-width: 90px;
+}
+#setup-choices button:hover {
+  background: #2e86de;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+#setup-choices button:active {
+  transform: scale(0.96);
+}
+#setup-choices.hidden,
+#setup-key-row.hidden {
+  display: none;
+}
+
+#setup-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1a2c38;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 6px 8px 6px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  box-sizing: border-box;
+}
+#setup-key-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #dde4ea;
+  font: 14px/1.4 'Nunito', sans-serif;
+  flex: 1 1 auto;
+  min-width: 0;
+  user-select: text;
+}
+#setup-key-input::placeholder {
+  color: #6b8594;
+}
+#setup-back {
+  font-size: 12px;
+  color: #8ea8b8;
+  cursor: pointer;
+  padding: 0 8px;
+  transition: color 120ms;
+  white-space: nowrap;
+}
+#setup-back:hover {
+  color: #dde4ea;
 }

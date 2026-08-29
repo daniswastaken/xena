@@ -108,6 +108,18 @@ export class BarWindow {
     }
   }
 
+  /** Open the bar in setup mode (first-run flow). */
+  summonSetup(): void {
+    if (this.away) this.restoreIdleSize();
+    const cursor = screen.getCursorScreenPoint();
+    const display = displayAt(cursor.x, cursor.y);
+    this.updateHome(display);
+    this.win.setPosition(this.home.x, this.home.y, false);
+    this.away = false;
+    this.show();
+    this.win.webContents.send(CHANNELS.setupBegin);
+  }
+
   /** Bar centered on the cursor: bar center == cursor point.
    *  Clamps to whichever display the cursor is currently on. */
   summonAtCursor(x: number, y: number): void {

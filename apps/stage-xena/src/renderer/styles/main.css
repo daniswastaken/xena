@@ -35,6 +35,7 @@ body {
   height: 500px;
   display: none;
   pointer-events: none;
+  z-index: 20;
 }
 
 #live2d-root canvas {

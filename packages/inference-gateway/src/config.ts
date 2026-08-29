@@ -9,8 +9,7 @@
  *   4. 9Router free oc/* — existing free-tier last resorts
  *   5. Pollinations (openai-fast) — keyless, zero-config final net
  */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readDotEnv } from "@xena/router9-client";
 import type { Router9Config } from "@xena/router9-client";
 
 export interface InferenceConfig extends Router9Config {
@@ -29,26 +28,6 @@ const DEFAULTS = {
   pollinationsTextModel: "openai-fast",
   pollinationsVisionModel: "",
 } as const;
-
-function readDotEnv(): Record<string, string> {
-  const out: Record<string, string> = {};
-  let dir = process.cwd();
-  for (let i = 0; i < 8; i++) {
-    try {
-      const raw = readFileSync(join(dir, ".env"), "utf8");
-      for (const line of raw.split(/\r?\n/)) {
-        const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
-        if (m && m[1] && m[2] !== undefined && !(m[1] in out)) out[m[1]!] = m[2]!;
-      }
-      break;
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  }
-  return out;
-}
 
 function parseBool(value: string | undefined): boolean | null {
   if (!value) return null;

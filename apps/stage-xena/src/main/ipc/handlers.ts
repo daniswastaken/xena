@@ -20,8 +20,9 @@ import { speakReply } from "../tts/speak.js";
 import type { SettingsStore } from "../settings/store.js";
 import type { ProactiveScheduler } from "../proactive/scheduler.js";
 import type { BarWindow } from "../window/bar-window.js";
+import { dataDir } from "../paths.js";
 
-const DATA_DIR = join(process.cwd(), "data");
+const DATA_DIR = dataDir();
 
 /** Fresh-screen cache: follow-up /look questions reuse the last capture. */
 const CAPTURE_TTL_MS = 60_000;

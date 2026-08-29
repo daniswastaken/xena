@@ -12,8 +12,7 @@
  * model like oc/big-pickle) AND it handles both text and vision in one pool,
  * so one free key covers two capabilities.
  */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readDotEnv } from "./paths.js";
 
 export interface Router9Config {
   /** 9Router base URL (e.g. http://localhost:20129/v1). */
@@ -45,26 +44,6 @@ const DEFAULTS = {
   fallbackTextModels: ["oc/laguna-s-2.1-free", "oc/mimo-v2.5-free"],
   fallbackVisionModels: ["oc/mimo-v2.5-free"],
 } as const;
-
-function readDotEnv(): Record<string, string> {
-  const out: Record<string, string> = {};
-  let dir = process.cwd();
-  for (let i = 0; i < 8; i++) {
-    try {
-      const raw = readFileSync(join(dir, ".env"), "utf8");
-      for (const line of raw.split(/\r?\n/)) {
-        const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
-        if (m && m[1] && m[2] !== undefined && !(m[1] in out)) out[m[1]] = m[2];
-      }
-      break;
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  }
-  return out;
-}
 
 function parseList(value: string | undefined): string[] {
   if (!value) return [];

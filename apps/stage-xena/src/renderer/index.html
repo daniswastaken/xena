@@ -16,6 +16,16 @@
         <button id="bubble-copy" class="hidden" title="Copy reply">copy</button>
         <div id="bubble-tail"></div>
       </div>
+      <div id="setup-ui" class="hidden">
+        <div id="setup-choices">
+          <button id="setup-yes" type="button">yes</button>
+          <button id="setup-no" type="button">no</button>
+        </div>
+        <div id="setup-key-row" class="hidden">
+          <input id="setup-key-input" type="text" placeholder="paste your Gemini key here…" autocomplete="off" spellcheck="false" />
+          <span id="setup-back">← back</span>
+        </div>
+      </div>
       <div id="live2d-root"></div>
     </div>
     <script src="./assets/vendor/live2dcubismcore.min.js"></script>

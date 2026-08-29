@@ -30,7 +30,15 @@ export interface XenaApi {
    onEmote(callback: (emotion: string) => void): () => void;
    onLive2d(callback: (config: Live2dConfig) => void): () => void;
    getLive2d(): Promise<Live2dConfig>;
-   onSummon(callback: (payload: SummonPayload) => void): () => void;
+  submitSetup(text: string): void;
+  backSetup(): void;
+  notifySetupAudioEnd(): void;
+  onSetupBegin(callback: () => void): () => void;
+  onSetupBubble(callback: (text: string) => void): () => void;
+  onSetupMood(callback: (mood: string) => void): () => void;
+  onSetupDone(callback: () => void): () => void;
+  onSetupStep(callback: (step: string) => void): () => void;
+  onSummon(callback: (payload: SummonPayload) => void): () => void;
     onPointerShow(callback: (payload: { x: number; y: number; label: string; dwellMs: number }) => void): () => void;
     onPointerHide(callback: () => void): () => void;
     onGaze(callback: (payload: { dx: number; dy: number; hold?: number }) => void): () => void;
@@ -118,6 +126,34 @@ const api: XenaApi = {
     return () => ipcRenderer.removeListener(CHANNELS.live2dSet, listener);
   },
   getLive2d: () => ipcRenderer.invoke(CHANNELS.live2dGet),
+  submitSetup: (text: string) => ipcRenderer.send(CHANNELS.setupSubmit, text),
+  backSetup: () => ipcRenderer.send(CHANNELS.setupBack),
+  notifySetupAudioEnd: () => ipcRenderer.send(CHANNELS.setupAudioEnd),
+  onSetupBegin: (callback) => {
+    const listener = (): void => callback();
+    ipcRenderer.on(CHANNELS.setupBegin, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.setupBegin, listener);
+  },
+  onSetupBubble: (callback) => {
+    const listener = (_: unknown, text: string): void => callback(text);
+    ipcRenderer.on(CHANNELS.setupBubble, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.setupBubble, listener);
+  },
+  onSetupMood: (callback) => {
+    const listener = (_: unknown, mood: string): void => callback(mood);
+    ipcRenderer.on(CHANNELS.setupMood, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.setupMood, listener);
+  },
+  onSetupDone: (callback) => {
+    const listener = (): void => callback();
+    ipcRenderer.on(CHANNELS.setupDone, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.setupDone, listener);
+  },
+  onSetupStep: (callback) => {
+    const listener = (_: unknown, step: string): void => callback(step);
+    ipcRenderer.on(CHANNELS.setupStep, listener);
+    return () => ipcRenderer.removeListener(CHANNELS.setupStep, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("xena", api);
