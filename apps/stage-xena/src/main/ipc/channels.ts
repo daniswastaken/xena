@@ -14,8 +14,6 @@ export const CHANNELS = {
   pointerShow: "pointer:show",
   pointerHide: "pointer:hide",
   gazeUpdate: "avatar:gaze",
-  voiceRecordSet: "voice:record-set",
-  voiceTranscribe: "voice:transcribe",
   getStats: "chat:stats",
   chatResize: "chat:resize",
   openExternal: "shell:open-external",

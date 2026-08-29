@@ -3,8 +3,6 @@
  * in its own chat window — this surface is input + status feedback only.
  */
 import { xena } from "./composables/use-xena-api.js";
-import { startCapture, stopCapture, onRecordingStoppedBySilence } from "./composables/use-mic.js";
-import { stopPlayback } from "./composables/use-voice.js";
 
 const FADE_AFTER_ANSWER_MS = 8000;
 const FADE_IDLE_MS = 10000;
@@ -47,6 +45,15 @@ function scheduleFade(delayMs: number): void {
   }, delayMs);
 }
 
+function focusInput(): void {
+  if (document.activeElement === input) return;
+  input.focus();
+  try {
+    input.setSelectionRange(input.value.length, input.value.length);
+  } catch {}
+  setInteractive(true);
+}
+
 function show(): void {
   cancelFade();
   wrap.classList.remove("hidden", "fading");
@@ -54,20 +61,11 @@ function show(): void {
   setInteractive(true);
   xena.requestBarResize(72);
   scheduleFade(FADE_IDLE_MS);
-  const focusInput = () => {
-    input.focus();
-    try {
-      input.setSelectionRange(input.value.length, input.value.length);
-    } catch {}
-    setInteractive(true);
-  };
-  requestAnimationFrame(() => {
-    focusInput();
-    window.setTimeout(focusInput, 30);
-    window.setTimeout(focusInput, 100);
-    window.setTimeout(focusInput, 250);
-    window.setTimeout(focusInput, 500);
-  });
+  // Focus lands instantly — no frame delay before the first attempt.
+  focusInput();
+  // Shrink retry tail: window focus may arrive a beat later on Windows.
+  window.setTimeout(focusInput, 30);
+  window.setTimeout(focusInput, 80);
 }
 
 function hide(): void {
@@ -78,12 +76,6 @@ function hide(): void {
   wrap.classList.remove("fading");
   setStatus("");
   pendingQueue.length = 0;
-  // Esc during a recording cancels it — audio is discarded, not sent.
-  if (recording) {
-    recording = false;
-    dot.classList.remove("thinking");
-    stopCapture();
-  }
   input.value = "";
   busy = false;
   dot.classList.remove("busy");
@@ -135,12 +127,6 @@ const pendingQueue: string[] = [];
 async function submit(raw: string): Promise<void> {
   const text = raw.trim();
   if (text === "") return;
-  // Typing while recording: the typed message wins, audio is discarded.
-  if (recording) {
-    recording = false;
-    dot.classList.remove("thinking");
-    stopCapture();
-  }
   if (busy) {
     if (pendingQueue.length < 2) {
       pendingQueue.push(text);
@@ -285,64 +271,6 @@ xena.onChatError((payload) => {
   setStatus(payload.line, true);
   scheduleFade(FADE_AFTER_ANSWER_MS);
 });
-
-// Push-to-talk: Ctrl+Alt+V starts/stops capture; on stop the audio is
-// transcribed and auto-submitted as a chat message.
-let recording = false;
-xena.onVoiceRecord((active) => {
-  if (active === recording) return;
-  recording = active;
-  if (active) {
-    // Barge-in: kill Xena's voice so the mic doesn't hear her own TTS.
-    stopPlayback();
-    void startCapture().then(() => {
-      show();
-      cancelFade(); // a long speech must not hit the 10s idle fade
-      setStatus("listening… (speak, then pause — or Ctrl+Alt+V to stop)");
-      dot.classList.add("thinking");
-    }).catch(() => {
-      setStatus("Microphone unavailable — check Windows privacy settings.", true);
-      scheduleFade(FADE_AFTER_ANSWER_MS);
-    });
-    return;
-  }
-  dot.classList.remove("thinking");
-  const wav = stopCapture();
-  void finishRecording(wav);
-});
-
-// Auto-stop: silence after speech ends the recording on its own.
-onRecordingStoppedBySilence(() => {
-  if (!recording) return;
-  recording = false;
-  dot.classList.remove("thinking");
-  const wav = stopCapture();
-  void finishRecording(wav);
-});
-
-function finishRecording(wav: string | null): void {
-  if (wav === null) {
-    setStatus("Didn't catch that — no audio recorded.", true);
-    scheduleFade(FADE_AFTER_ANSWER_MS);
-    return;
-  }
-  setStatus("transcribing…");
-  void xena
-    .sendVoiceAudio(wav)
-    .then((text) => {
-      if (text.trim() !== "") {
-        setStatus(`you said: ${text}`);
-        void submit(text);
-      } else {
-        setStatus("Heard nothing usable.", true);
-        scheduleFade(FADE_AFTER_ANSWER_MS);
-      }
-    })
-    .catch((err) => {
-      setStatus(friendlyError((err as Error).message), true);
-      scheduleFade(FADE_AFTER_ANSWER_MS);
-    });
-}
 
 // Input history: up/down walks previously sent messages.
 const history: string[] = [];

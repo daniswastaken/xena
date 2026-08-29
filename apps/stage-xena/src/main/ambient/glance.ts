@@ -1,8 +1,9 @@
 /**
- * Ambient screen glances (opt-in, default OFF): every GLANCE_INTERVAL_MS,
- * capture the screen and let the vision model make ONE short observation,
- * delivered as a visible proactive comment — the user always sees exactly
- * what was captured. Quiet hours + busy gate respected.
+ * Ambient screen glances: capture the screen and let the vision model make
+ * ONE short observation, delivered as a visible proactive comment — the
+ * user always sees exactly what was captured. Triggered by the unified
+ * initiative scheduler (5-7 min random cadence). Quiet hours + busy gate
+ * respected.
  */
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -11,7 +12,6 @@ import { buildSystemPrompt, extractEmotion, extractFactTags } from "@xena/xena-c
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
 
-const GLANCE_INTERVAL_MS = Number(process.env.XENA_TEST_GLANCE_MS) || 30 * 60_000;
 const QUIET_HOURS = { start: 23, end: 8 };
 
 const GLANCE_PROMPT =
@@ -19,30 +19,17 @@ const GLANCE_PROMPT =
   "Do not address the user directly, do not ask questions, do not read out private text verbatim.";
 
 export class GlanceTimer {
-  private timer: NodeJS.Timeout | null = null;
-
   constructor(
     private readonly getWindow: () => Electron.BrowserWindow,
     private readonly config: InferenceConfig,
-    private readonly isEnabled: () => Promise<boolean>,
     private readonly isBusy: () => boolean,
     private readonly onSpeak: (text: string, mood?: string) => Promise<void>,
     private readonly diaryDir?: string,
   ) {}
 
-  start(): void {
-    if (this.timer) return;
-    this.timer = setInterval(() => void this.tick(), GLANCE_INTERVAL_MS);
-  }
-
-  stop(): void {
-    if (this.timer) clearInterval(this.timer);
-    this.timer = null;
-  }
-
-  private async tick(): Promise<void> {
+  /** One glance, now — called by the initiative scheduler. */
+  async glanceNow(): Promise<void> {
     if (this.isBusy()) return;
-    if (!(await this.isEnabled())) return;
     const hour = new Date().getHours();
     if (hour >= QUIET_HOURS.start || hour < QUIET_HOURS.end) return;
 

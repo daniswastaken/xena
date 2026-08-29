@@ -10,9 +10,8 @@ A Neuro-sama-inspired AI desktop companion scoped to a **bottom-right corner Liv
 - A separate translucent **summon bar** window (bottom-left by default, Spotlight-style) for input + inline streaming reply
 - Replies render in a **mood-tinted speech bubble anchored to Mao's head** inside the avatar window
 - The avatar *talks* — mouth flap synced to the TTS audio duration, per-mood expression ALTERNATES, gaze tracking on the cursor
-- The companion *sees* on command (`/look <question>`), *remembers* (SQLite transcripts + JSON diary + facts store + keyword+recency recall), and occasionally *initiates* (proactive idle comments, ambient screen glances)
-- Voice input via push-to-talk (`Ctrl+Alt+V`) — mic → WAV → Gemini inline-audio transcription (9Router gpt-audio secondary) → auto-sent as chat
-- All inference is **remote**, orchestrated by `packages/inference-gateway`: Gemini flash primary (text + vision + STT, one free key) → flash-lite → 9Router rungs (spawned/supervised by Xena) → keyless Pollinations last resort. Self-recovery at model/provider/process level; raw provider errors never reach the bubble (ADR-004)
+- The companion *sees* on command (`/look <question>`), *remembers* (SQLite transcripts + JSON diary + facts store + keyword+recency recall), and occasionally *initiates* (unified 5-7 min randomized initiative clock: ambient screen glances OR proactive comments)
+- All inference is **remote**, orchestrated by `packages/inference-gateway`: Gemini flash primary (text + vision, one free key) → flash-lite → 9Router rungs (spawned/supervised by Xena) → keyless Pollinations last resort. Self-recovery at model/provider/process level; raw provider errors never reach the bubble (ADR-004)
 
 **Not** a goal (scope discipline): full Live2D authoring pipeline, real-time stream interaction, singing, multi-channel chatbots. The corner-overlay form factor and the "weak-laptop-no-GPU" constraint are permanent.
 
@@ -26,14 +25,14 @@ A Neuro-sama-inspired AI desktop companion scoped to a **bottom-right corner Liv
 | OS | Windows 11, PowerShell 5.1 default shell |
 
 Implications:
-- All LLM / vision / STT inference is remote. **No** local model inference.
+- All LLM / vision inference is remote. **No** local model inference.
 - Avatar rendering stays trivial: `pixi.js` + `pixi-live2d-display` (Cubism 4) for Mao. No three.js, no WebGL pipeline of our own to maintain.
 - Steady-state footprint target: **≤300 MB** private across Electron processes. Current measured: ~190–230 MB / 5 procs.
 
 ## Infrastructure Already In Place (do not re-create)
 
 ### Inference chain — `packages/inference-gateway` (ADR-004)
-Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one key covers text + vision + STT) → `gemini-2.5-flash-lite` (higher free RPD) → **9Router** `oc/big-pickle` + `oc/*` free models (reasoning rung) → **Pollinations** `openai-fast` (keyless final net). Vision: same Gemini rungs → 9Router `oc/x-preview-f-free` → `oc/mimo-v2.5-free`.
+Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one key covers text + vision) → `gemini-2.5-flash-lite` (higher free RPD) → **9Router** `oc/big-pickle` + `oc/*` free models (reasoning rung) → **Pollinations** `openai-fast` (keyless final net). Vision: same Gemini rungs → 9Router `oc/x-preview-f-free` → `oc/mimo-v2.5-free`.
 - `apps/*` import `@xena/inference-gateway`; the gateway is the only `router9-client` consumer. Renderer never fetches directly.
 - Self-recovery: 404/empty evicts a model 10 min; 3 consecutive provider failures = 5-min offline; total-chain collapse auto-resets the supervisor; tray has "Restart inference" (never restarts Xena).
 - Errors classify into `InferenceError` kinds; main maps them to persona lines (`main/ui/error-lines.ts`) — raw provider text only ever reaches console + tray diagnostics.
@@ -43,12 +42,12 @@ Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one
 - OpenAI-compatible `http://localhost:20129/v1`; key in `.env` (`ROUTER9_API_KEY`)
 - **Xena spawns it at boot** (`NineRouterChild`: `--port 20129 --no-browser --skip-update`, 60s health probes, 5s→30s respawn backoff, tree-kill on quit). An already-running instance is adopted, never double-spawned, never killed.
 - Disable the rung entirely: `XENA_NINEROUTER_ENABLED=0` in `.env` (pure Gemini + Pollinations stack)
-- Free models in production: `oc/big-pickle` (reasoning, `reasoning_content`), `oc/x-preview-f-free` (vision), `oc/laguna-s-2.1-free`, `oc/mimo-v2.5-free`, `tokenrouter/openai/gpt-audio-mini` (STT secondary)
+- Free models in production: `oc/big-pickle` (reasoning, `reasoning_content`), `oc/x-preview-f-free` (vision), `oc/laguna-s-2.1-free`, `oc/mimo-v2.5-free`
 - Dashboard: `http://localhost:20129/dashboard` (password `123456`) — only for provider changes
 - If `/v1/models` fails while Xena runs: the child supervisor handles respawn; no agent action needed. Outside the app, the user may still start `9router` manually.
 
 ### Gemini — primary provider
-- Free AI Studio key in `.env` (`XENA_GEMINI_API_KEY`). Models: `gemini-2.5-flash` (chat + vision + STT), `gemini-2.5-flash-lite` (overflow rung).
+- Free AI Studio key in `.env` (`XENA_GEMINI_API_KEY`). Models: `gemini-2.5-flash` (chat + vision), `gemini-2.5-flash-lite` (overflow rung).
 - Health is inferred from request outcomes only — never probe Gemini for liveness (free-tier etiquette).
 
 ### OmniRoute — secondary router (exists, do not touch)
@@ -72,9 +71,8 @@ project-xena/
 │       │   │   ├── tray/                 # tray icon, quick actions, settings surface
 │       │   │   ├── capture/              # desktopCapturer + vision chain wiring
 │       │   │   ├── ipc/                  # typed IPC handlers main<->renderer
-│       │   │   ├── input/                # global hotkeys, cursor-shake, push-to-talk
+│       │   │   ├── input/                # global hotkeys, cursor-shake, gaze tracker
 │       │   │   ├── tts/                  # edge-tts glue, audio duration tracking
-│       │   │   ├── voice-input/          # mic capture, WAV b64, gpt-audio STT
 │       │   │   ├── pointer/              # AI Pointer window + glide + guided tasks
 │       │   │   ├── proactive/            # idle comments, ambient glances, scheduler
 │       │   │   ├── settings/             # persisted preferences, tray sync
@@ -112,7 +110,6 @@ project-xena/
 │   │   ├── src/chain.ts                # rung walk, failover, error classification
 │   │   ├── src/supervisor.ts           # provider/model health, evictions, resetInference()
 │   │   ├── src/child9router.ts         # spawn/adopt/probe/respawn the 9router child
-│   │   ├── src/stt.ts                  # Gemini inline-audio + gpt-audio chain
 │   │   ├── src/errors.ts               # InferenceError kinds (bubble never sees raw)
 │   │   └── src/config.ts               # .env load, chain-order config
 │   ├── router9-client/                 # pure 9Router wire transport + shared API types
@@ -187,12 +184,11 @@ When the user supplies a different/upgraded Live2D model it replaces Mao one-to-
 | Streaming text + token-flap | ✓ | never restart after first token, even across failover |
 | Provider failover (text + vision) | ✓ | Gemini primary, flash-lite, 9Router `oc/*`, keyless Pollinations; eviction + breakers (ADR-004) |
 | Vision on command (`/look`) | ✓ | desktopCapturer → JPEG → Gemini vision chain → correct on-screen description |
-| Ambient screen glances | ✓ | opt-in, default OFF, 30 min cadence, quiet-hours gated |
+| Ambient screen glances | ✓ | opt-in, default OFF, fired by the unified initiative clock |
 | Guided tasks | ✓ | natural-language "how do I…?" → vision-driven multi-step tutor + AI Pointer |
 | Edge TTS | ✓ | JP Nanami, mouth flap synced to audio duration, ON/OFF in tray |
-| Voice input (push-to-talk) | ✓ | `Ctrl+Alt+V`, mic → WAV → Gemini inline audio (gpt-audio secondary) → auto-submit |
 | Memory | ✓ | SQLite transcripts, JSON diary, facts store, keyword+recency recall |
-| Proactive idle comments | ✓ | 45 min idle, cooldown, quiet-hours gate, tray toggle |
+| Proactive comments + glances | ✓ | unified 5-7 min randomized initiative clock, coin-flip pick, quiet-hours gate, tray toggles |
 | Single-instance lock | ✓ | |
 | Start with Windows | ✓ | opt-in |
 | Real Live2D art from user | ✗ | next: one-to-one swap under `assets/live2d/<name>/` |

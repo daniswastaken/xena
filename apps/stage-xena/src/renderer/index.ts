@@ -102,10 +102,15 @@ initVoice({
   stop: () => {
     ttsPlaying = false;
     l2d?.setTalking(false);
+    l2d?.setAudioLevel(0);
     if (pendingText !== null && pendingText.trim() !== "") {
       scheduleBubbleFade(3000);
       pendingText = null;
     }
+  },
+  onLevel: (level) => {
+    // Real audio loudness drives the mouth — the JP lip-sync fix.
+    l2d?.setAudioLevel(level);
   },
 });
 
@@ -128,9 +133,12 @@ xena.onEmote((emotion) => {
   }
 });
 
-// Mao watches the user's cursor — unless she's talking.
-xena.onGaze(({ dx, dy }) => {
-  if (!ttsPlaying) l2d?.setGaze(dx, dy);
+// Cursor position feed — the stage's random gaze engine decides when to
+// actually track (AIRI-style: mostly free-roam, periodic engage windows).
+// `hold` marks a forced glance (pointer targets etc.).
+xena.onGaze(({ dx, dy, hold }) => {
+  if (hold && hold > 0) l2d?.forceTrack(hold);
+  l2d?.setGaze(dx, dy);
 });
 
 // Reply events render as speech bubbles anchored to Mao.

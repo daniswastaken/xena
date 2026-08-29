@@ -23,13 +23,19 @@ export function isEmotion(value: string): value is Emotion {
   return (EMOTIONS as readonly string[]).includes(value);
 }
 
+/** Strips any leading bracketed tag so hallucinated ones can't leak; matches
+ *  the known set only for emote-driving. */
+const ANY_LEAD_TAG_RE = /^\[[^\]\n]{1,30}\]\s*/;
+
 export function extractEmotion(text: string): EmotionParseResult {
   TAG_RE.lastIndex = 0;
   const first = TAG_RE.exec(text);
   const emotion = first ? (first[1]!.toLowerCase() as Emotion) : null;
-  // Collapse space runs the removal leaves behind, but keep line structure.
+  // Remove recognized tags anywhere, plus one unknown leading tag (model
+  // hallucination like "[bubbly-hope]") before the clean text surfaces.
   const clean = text
     .replace(TAG_RE, "")
+    .replace(ANY_LEAD_TAG_RE, "")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
   return { clean, emotion };

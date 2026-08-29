@@ -160,15 +160,29 @@ export class BarWindow {
     this.shownAt = Date.now();
     this.win.show();
     this.win.setIgnoreMouseEvents(false);
-    try {
-      app.focus({ steal: true });
-    } catch {}
-    const handle = this.win.getNativeWindowHandle();
-    // Bypass Windows focus-steal block for synthetic shake summons.
-    // Direct user32 SetForegroundWindow via PowerShell is the only
-    // reliable path when the summon isn't from a globalShortcut.
+    // Instant focus path — no delay before the first attempt so typing
+    // lands in the input the moment the bar appears (cursor-shake fix).
+    this.doFocus();
+    // Native focus-steal block (Windows foreground lock) can swallow the
+    // first attempt for synthetic summons — retry on the next ticks.
+    setTimeout(() => { if (this.win.isVisible()) this.doFocus(); }, 50);
+    setTimeout(() => { if (this.win.isVisible()) this.doFocus(); }, 150);
+    setTimeout(() => {
+      if (this.win.isVisible() && !this.win.isFocused()) this.doFocus();
+    }, 350);
+    this.win.webContents.send(CHANNELS.summonAt, { mode: "corner" });
+  }
+
+  private doFocus(): void {
+    this.win.moveTop();
+    this.win.focus();
+    this.win.webContents.focus();
+    // Renderer focuses the input itself on summon; the win32 foreground
+    // boost below is the fallback for the OS focus-steal block.
+    try { app.focus({ steal: true }); } catch {}
     const forceWin32Foreground = () => {
       try {
+        const handle = this.win.getNativeWindowHandle();
         const hwnd = handle.readInt32LE(0);
         if (hwnd === 0) return;
         const ps =
@@ -177,23 +191,11 @@ export class BarWindow {
         execFile("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true }, () => {});
       } catch {}
     };
-    const doFocus = () => {
-      this.win.moveTop();
-      this.win.focus();
-      // @ts-expect-error win32
-      if (typeof this.win.setForegroundWindow === "function") this.win.setForegroundWindow();
-      this.win.webContents.focus();
-      forceWin32Foreground();
-    };
+    // Only pay the PowerShell spawn when the Electron focus didn't land.
     setTimeout(() => {
-      doFocus();
-      this.win.webContents.send(CHANNELS.summonAt, { mode: "corner" });
-      setTimeout(() => { if (this.win.isVisible()) doFocus(); }, 50);
-      setTimeout(() => { if (this.win.isVisible()) doFocus(); }, 200);
-      // Verify OS focus landed; if not, retry once more via win32
-      setTimeout(() => {
-        if (this.win.isVisible() && !this.win.isFocused()) doFocus();
-      }, 400);
-    }, 15);
+      if (!this.win.isDestroyed() && this.win.isVisible() && !this.win.isFocused()) {
+        forceWin32Foreground();
+      }
+    }, 30);
   }
 }

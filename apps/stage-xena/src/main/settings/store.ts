@@ -10,14 +10,10 @@ export interface XenaSettings {
   shakeEnabled: boolean;
   /** avatar (Live2D stage) visible in the corner overlay */
   avatarEnabled: boolean;
-  /** folder name under assets/live2d/; empty = first available */
-  live2dModel: string;
   /** launch Xena when Windows starts */
   autostartEnabled: boolean;
   /** periodic one-line screen observations, visible as proactive comments */
   ambientEnabled: boolean;
-  /** push-to-talk voice input (Ctrl+Alt+V) */
-  voiceInputEnabled: boolean;
   /** oc/* model id; empty = default from .env */
   textModel: string;
 }
@@ -27,10 +23,8 @@ const DEFAULTS: XenaSettings = {
   proactiveEnabled: true,
   shakeEnabled: true,
   avatarEnabled: true,
-  live2dModel: "",
   autostartEnabled: false,
   ambientEnabled: false,
-  voiceInputEnabled: true,
   textModel: "",
 };
 

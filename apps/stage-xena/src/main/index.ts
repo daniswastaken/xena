@@ -1,9 +1,8 @@
 /**
  * Xena main process entry.
  */
-import { app, globalShortcut, session } from "electron";
+import { app, globalShortcut } from "electron";
 import { join } from "node:path";
-import { readdirSync } from "node:fs";
 import { createAvatarWindow } from "./window/overlay.js";
 import { BarWindow } from "./window/bar-window.js";
 import { PointerWindow } from "./window/pointer-window.js";
@@ -19,17 +18,8 @@ import { ShakeDetector } from "./input/shake-detector.js";
 import { GazeTracker } from "./input/gaze-tracker.js";
 import { GlanceTimer } from "./ambient/glance.js";import { CHANNELS } from "./ipc/channels.js";
 
-/** Folder names under assets/live2d/ that contain a *.model3.json. */
-function scanLive2dModels(baseDir: string): string[] {
-  try {
-    return readdirSync(baseDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && readdirSync(join(baseDir, e.name)).some((f) => f.endsWith(".model3.json")))
-      .map((e) => e.name)
-      .sort();
-  } catch {
-    return [];
-  }
-}
+/** The one and only Live2D model directory name (Mao). */
+const LIVE2D_MODEL = "mao";
 
 // Rebrand: present as "Xena" (not bare Electron) in the OS shell, taskbar
 // grouping, and process metadata.
@@ -39,16 +29,10 @@ app.setAppUserModelId("com.xena.app");
 // Weak iGPU target: keep Chromium from spawning extra GPU processes when possible.
 app.commandLine.appendSwitch("disable-gpu-sandbox");
 app.commandLine.appendSwitch("log-level", "3");
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 // Suppress noisy AMD DirectComposition error from child GPU process.
 process.env.ELECTRON_ENABLE_LOGGING = "0";
 process.env.ELECTRON_ENABLE_STACK_DUMPING = "0";
-
-// Mic access for push-to-talk voice input (bar window only).
-app.on("session-created", (ses) => {
-  ses.setPermissionRequestHandler((_wc, permission, callback) => {
-    callback(permission === "media" || permission === "clipboard-sanitized-write");
-  });
-});
 
 // Tray companion must never die to an async straggler.
 process.on("unhandledRejection", () => undefined);
@@ -164,11 +148,10 @@ if (!gotLock) {
     gazeInstance.start();
     gaze = gazeInstance;
     registerIpcHandlers(config, settings, scheduler, bar, () => avatar, new PointerWindow(), gaze);
-    scheduler.start();
+    // Glances are initiatives fired by the unified scheduler clock.
     const glances = new GlanceTimer(
       () => avatar,
       config,
-      async () => (await settings.get()).ambientEnabled,
       () => scheduler.isBusy(),
       async (observation, mood) => {
         const { voiceEnabled } = await settings.get();
@@ -178,7 +161,11 @@ if (!gotLock) {
       },
       join(process.cwd(), "data", "diary"),
     );
-    glances.start();
+    void glances;
+    // Unified initiative clock: every 5-7 min either an ambient glance or
+    // an AI-initiated comment (coin flip, per-feature settings gate each).
+    scheduler.setGlanceHook(() => glances.glanceNow());
+    scheduler.start();
 
     shake = new ShakeDetector((x, y) => {
       void settings.get().then(({ shakeEnabled }) => {
@@ -187,16 +174,13 @@ if (!gotLock) {
     });
     shake.start();
 
-    const live2dModels = scanLive2dModels(join(__dirname, "../renderer/assets/live2d"));
     const pushLive2d = (): void => {
-      void settings.get().then(({ avatarEnabled, live2dModel }) => {
-        const model = live2dModel || live2dModels[0] || "hiyori";
-        avatar.webContents.send("avatar:live2d", { enabled: avatarEnabled, model });
+      void settings.get().then(({ avatarEnabled }) => {
+        avatar.webContents.send("avatar:live2d", { enabled: avatarEnabled, model: LIVE2D_MODEL });
       });
     };
 
     createTray(bar, join(__dirname, "../renderer/assets"), settings, {
-      live2dModels,
       onLive2dChange: pushLive2d,
     }, {
       statusLine: () =>
@@ -215,19 +199,6 @@ if (!gotLock) {
     });
     // Restore persisted Live2D preference once the renderer is up.
     pushLive2d();
-
-    // Ctrl+Alt+V — push-to-talk voice input toggle.
-    let voiceRecording = false;
-    globalShortcut.register("Control+Alt+V", () => {
-      void settings.get().then(({ voiceInputEnabled }) => {
-        if (!voiceInputEnabled) return;
-        voiceRecording = !voiceRecording;
-        // While listening, Mao looks at you instead of the cursor.
-        if (voiceRecording) gaze?.lookAtUser(120_000);
-        else gaze?.releaseOverride();
-        bar?.win.webContents.send(CHANNELS.voiceRecordSet, voiceRecording);
-      });
-    });
 
     // Ctrl+Alt+X — global summon. XENA_NO_HOTKEY=1 disables (debug).
     if (process.env.XENA_NO_HOTKEY !== "1") {

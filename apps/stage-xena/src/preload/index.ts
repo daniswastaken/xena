@@ -33,10 +33,8 @@ export interface XenaApi {
    onSummon(callback: (payload: SummonPayload) => void): () => void;
     onPointerShow(callback: (payload: { x: number; y: number; label: string; dwellMs: number }) => void): () => void;
     onPointerHide(callback: () => void): () => void;
-   onGaze(callback: (payload: { dx: number; dy: number }) => void): () => void;
-   onVoiceRecord(callback: (active: boolean) => void): () => void;
-   sendVoiceAudio(base64Wav: string): Promise<string>;
-   getStats(): Promise<string>;
+    onGaze(callback: (payload: { dx: number; dy: number; hold?: number }) => void): () => void;
+    getStats(): Promise<string>;
    requestChatResize(height: number): void;
    openExternal(url: string): void;
   noteActivity(): void;
@@ -102,16 +100,10 @@ const api: XenaApi = {
     return () => ipcRenderer.removeListener(CHANNELS.pointerHide, listener);
   },
   onGaze: (callback) => {
-    const listener = (_: unknown, payload: { dx: number; dy: number }): void => callback(payload);
+    const listener = (_: unknown, payload: { dx: number; dy: number; hold?: number }): void => callback(payload);
     ipcRenderer.on(CHANNELS.gazeUpdate, listener);
     return () => ipcRenderer.removeListener(CHANNELS.gazeUpdate, listener);
   },
-  onVoiceRecord: (callback) => {
-    const listener = (_: unknown, active: boolean): void => callback(active);
-    ipcRenderer.on(CHANNELS.voiceRecordSet, listener);
-    return () => ipcRenderer.removeListener(CHANNELS.voiceRecordSet, listener);
-  },
-  sendVoiceAudio: (base64Wav) => ipcRenderer.invoke(CHANNELS.voiceTranscribe, base64Wav),
   getStats: () => ipcRenderer.invoke(CHANNELS.getStats),
   requestChatResize: (height: number) => ipcRenderer.send(CHANNELS.chatResize, height),
   openExternal: (url: string) => ipcRenderer.send(CHANNELS.openExternal, url),

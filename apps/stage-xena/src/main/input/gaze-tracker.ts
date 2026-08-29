@@ -26,17 +26,12 @@ export class GazeTracker {
     this.override = this.pointToGaze(x, y, holdMs);
     const win = this.getWindow();
     if (this.override && win && !win.isDestroyed()) {
-      win.webContents.send(CHANNELS.gazeUpdate, { dx: this.override.dx, dy: this.override.dy });
+      win.webContents.send(CHANNELS.gazeUpdate, {
+        dx: this.override.dx,
+        dy: this.override.dy,
+        hold: holdMs,
+      });
     }
-  }
-
-  /** Looks straight ahead — at the user behind the screen. */
-  lookAtUser(holdMs: number): void {
-    const win = this.getWindow();
-    if (!win || win.isDestroyed()) return;
-    const b = win.getBounds();
-    this.override = this.pointToGaze(b.x + b.width / 2, b.y + b.height * 0.35, holdMs);
-    win.webContents.send(CHANNELS.gazeUpdate, { dx: this.override.dx, dy: this.override.dy });
   }
 
   /** Ends any gaze override; cursor tracking resumes. */

@@ -19,7 +19,6 @@ export {
   type FailoverResult,
   type ChainUsage,
 } from "./chain.js";
-export { transcribeAudio } from "./stt.js";
 
 // Re-export the shared API types + helpers callers already use, so the
 // import-line-only migration holds (ChatMessage, imageDataUrl, ...).

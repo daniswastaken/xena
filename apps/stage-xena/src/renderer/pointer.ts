@@ -1,7 +1,7 @@
 /**
- * AI Pointer renderer: fullscreen overlay; glides the cursor SVG to the
- * requested local coordinates with a CSS transform transition, ripples on
- * arrival, spins out when told to hide.
+ * AI Pointer renderer: fullscreen overlay; the cursor SVG always enters at
+ * the display center and glides to the requested local coordinates with a
+ * CSS transform transition, ripples on arrival, spins out when told to hide.
  */
 import { xena } from "./composables/use-xena-api.js";
 
@@ -11,7 +11,7 @@ const labelEl = root.querySelector(".label") as HTMLElement;
 
 let cx = 0;
 let cy = 0;
-let hasMoved = false;
+let hasEntered = false;
 let dwellTimer: number | null = null;
 
 function travelMs(x: number, y: number): number {
@@ -24,16 +24,23 @@ xena.onPointerShow(({ x, y, label, dwellMs }) => {
   root.classList.remove("leaving");
   root.classList.remove("hidden");
 
-  const t = travelMs(x, y);
-  if (hasMoved) {
-    cursor.style.transition = `transform ${t}ms cubic-bezier(0.33, 1, 0.68, 1)`;
-  } else {
+  if (!hasEntered) {
+    // Always enter from screen center and glide — never teleport in.
+    const w = root.clientWidth || window.innerWidth;
+    const h = root.clientHeight || window.innerHeight;
+    cx = w / 2;
+    cy = h / 2;
     cursor.style.transition = "none";
+    cursor.style.transform = `translate(${cx}px, ${cy}px)`;
+    void cursor.offsetWidth; // flush the center position before the glide
+    hasEntered = true;
   }
+
+  const t = travelMs(x, y);
+  cursor.style.transition = `transform ${t}ms cubic-bezier(0.33, 1, 0.68, 1)`;
   cursor.style.transform = `translate(${x}px, ${y}px)`;
   cx = x;
   cy = y;
-  hasMoved = true;
 
   // "click here" affordance on every arrival.
   root.classList.remove("arriving");
@@ -57,4 +64,6 @@ xena.onPointerHide(() => {
   if (dwellTimer) window.clearTimeout(dwellTimer);
   root.classList.remove("arriving");
   root.classList.add("leaving");
+  // Next appearance starts a fresh center-to-target glide.
+  hasEntered = false;
 });

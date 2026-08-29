@@ -51,9 +51,22 @@ export class Live2DStage {
   private flapPhase = 0;
   private vowelPhase = 0;
   private currentVowel = "ParamA";
+  /** Live audio loudness from the analyser (0..1). */
+  private audioLevel = 0;
+  private lastLevelAt = 0;
   private gaze = { dx: 0, dy: 0 };
   /** Smoothed gaze — eyes glide, never snap. */
   private gazeSmooth = { dx: 0, dy: 0 };
+  /**
+   * AIRI-style random gaze: she free-roams most of the time, then
+   * periodically engages cursor-tracking for a random window, then back.
+   * No trigger conditions — purely time-randomized mode flips.
+   */
+  private gazeMode: "roam" | "track" = "roam";
+  private gazeModeUntil = 0;
+  private roamT = 0;
+  private roamTarget = { dx: 0, dy: 0 };
+  private nextSaccadeAt = 0;
   private blinkState: "open" | "closing" | "closed" | "opening" = "open";
   private nextBlinkAt = 0;
   private blinkT = 0;
@@ -122,11 +135,48 @@ export class Live2DStage {
 
   setTalking(value: boolean): void {
     this.talking = value;
+    if (!value) this.audioLevel = 0;
+  }
+
+  /**
+   * Real audio loudness 0..1 from the playing TTS (WebAudio analyser).
+   * When receiving levels, the mouth follows the actual sound instead of
+   * the synthetic flap — the JP lip-sync fix.
+   */
+  setAudioLevel(level: number): void {
+    this.audioLevel = level;
+    this.lastLevelAt = Date.now();
   }
 
   /** Cursor position relative to the avatar, normalized -1..1. */
   setGaze(dx: number, dy: number): void {
     this.gaze = { dx, dy };
+  }
+
+  /** Forces cursor-tracking immediately (pointer targets / overrides). */
+  forceTrack(holdMs = 4000): void {
+    this.gazeMode = "track";
+    this.gazeModeUntil = Date.now() + holdMs;
+  }
+
+  /** Randomized mode schedule: roam 8-25s, track 4-12s, ad infinitum. */
+  private scheduleGazeMode(now: number): void {
+    if (now < this.gazeModeUntil) return;
+    if (this.gazeMode === "roam") {
+      this.gazeMode = "track";
+      this.gazeModeUntil = now + 4000 + Math.random() * 8000;
+    } else {
+      this.gazeMode = "roam";
+      this.gazeModeUntil = now + 8000 + Math.random() * 17_000;
+      this.roamTarget = this.nextRoamTarget();
+    }
+  }
+
+  private nextRoamTarget(): { dx: number; dy: number } {
+    return {
+      dx: Math.random() * 1.6 - 0.8,
+      dy: Math.random() * 0.9 - 0.45,
+    };
   }
 
   /**
@@ -228,11 +278,36 @@ export class Live2DStage {
     if (touch) {
       for (const [id, value] of touch) core.setParameterValueById(id, value);
     }
+
+    // --- Random gaze mode selection (AIRI-style engage/roam) -------------
+    const now = Date.now();
+    this.scheduleGazeMode(now);
+    let target = this.gaze;
+    if (this.talking) {
+      // Eye contact while speaking — main pins gaze to the user (0,0).
+      target = this.gaze;
+    } else if (this.gazeMode === "roam") {
+      // Free-roaming: slow drift toward wander targets with occasional
+      // quick saccades — organic idle eye movement, mostly NOT tracking.
+      this.roamT += 0.016;
+      if (now >= this.nextSaccadeAt) {
+        this.nextSaccadeAt = now + 900 + Math.random() * 2600;
+        this.roamTarget = this.nextRoamTarget();
+      }
+      const sway = 0.08 * Math.sin(this.roamT * 0.7);
+      const swayY = 0.06 * Math.sin(this.roamT * 0.45 + 1.3);
+      target = {
+        dx: this.roamTarget.dx + sway,
+        dy: this.roamTarget.dy + swayY,
+      };
+    }
+    // While talking she looks at the user (main sets gaze 0,0 for TTS).
+
     // Exponential smoothing toward the target: fast enough to feel alive,
-    // slow enough to read as organic eye movement.
-    const k = 0.12;
-    this.gazeSmooth.dx += (this.gaze.dx - this.gazeSmooth.dx) * k;
-    this.gazeSmooth.dy += (this.gaze.dy - this.gazeSmooth.dy) * k;
+    // slow enough to read as organic eye movement. Roam is lazier still.
+    const k = this.talking ? 0.12 : this.gazeMode === "roam" ? 0.045 : 0.12;
+    this.gazeSmooth.dx += (target.dx - this.gazeSmooth.dx) * k;
+    this.gazeSmooth.dy += (target.dy - this.gazeSmooth.dy) * k;
     const g = this.gazeSmooth;
     core.setParameterValueById("ParamEyeBallX", g.dx * 0.85);
     core.setParameterValueById("ParamEyeBallY", -g.dy * 0.55);
@@ -292,19 +367,32 @@ export class Live2DStage {
       | undefined;
     if (!core?.setParameterValueById) return;
     if (this.talking) {
-      // Vowel lip-sync: Mao has real A/I/U/E/O mouth shapes. Cycle them
-      // with the open/close flap layered on top — reads as actual speech.
-      this.flapPhase += 0.45;
+      // Audio-reactive when the analyser is live (levels arrived < 200ms
+      // ago); otherwise fall back to the synthetic flap.
+      const live = Date.now() - this.lastLevelAt < 200 ? this.audioLevel : null;
+      let open: number;
+      if (live !== null) {
+        // Real level: widen the range so speech reads clearly on the face.
+        open = Math.min(1, live * 1.25);
+        this.flapPhase += 0.45;
+      } else {
+        this.flapPhase += 0.45;
+        const jitter = 0.72 + 0.28 * Math.abs(Math.sin(this.flapPhase * 0.37));
+        open = ((Math.sin(this.flapPhase) + 1) / 2) * jitter;
+      }
+      // Vowel lip-sync: rotate mouth shapes at JP mora pace (~110ms) with
+      // amplitude locked to the openness so quiet syllables narrow the mouth.
       this.vowelPhase += 0.45;
-      const jitter = 0.72 + 0.28 * Math.abs(Math.sin(this.flapPhase * 0.37));
-      const open = ((Math.sin(this.flapPhase) + 1) / 2) * jitter;
-      core.setParameterValueById("ParamMouthOpenY", open * 0.9);
       if (this.vowelPhase >= 1) {
         this.vowelPhase = 0;
         const vowels = ["ParamA", "ParamI", "ParamU", "ParamE", "ParamO"];
         this.currentVowel = vowels[Math.floor(Math.random() * vowels.length)]!;
       }
-      const vowelOpen = 0.35 + open * 0.55;
+      // Boost amplitude + floor: the mouth never fully slams shut mid-
+      // speech (kills the "static" look during JP mora runs).
+      const shaped = 0.08 + open * 0.92;
+      core.setParameterValueById("ParamMouthOpenY", shaped);
+      const vowelOpen = 0.3 + shaped * 0.6;
       for (const v of ["ParamA", "ParamI", "ParamU", "ParamE", "ParamO"]) {
         core.setParameterValueById(v, v === this.currentVowel ? vowelOpen : 0);
       }

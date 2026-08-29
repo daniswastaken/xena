@@ -1,6 +1,6 @@
 /** Interactive screen guidance: plan one visible action, wait for its result, repeat. */
 import { nativeImage, screen } from "electron";
-import { buildSystemPrompt } from "@xena/xena-core";
+import { buildSystemPrompt, extractEmotion } from "@xena/xena-core";
 import { visionCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
@@ -193,13 +193,14 @@ Use continue when the user must perform another visible action. Use done only wh
   }
 
   private async say(raw: string): Promise<void> {
-    const mood = /^\[(happy|smug|surprised|annoyed|sleepy|sad)\]\s*/i.exec(raw)?.[1]?.toLowerCase();
-    const clean = raw.replace(/^\[(?:happy|smug|surprised|annoyed|sleepy|sad)\]\s*/i, "").trim();
+    const parsed = extractEmotion(raw);
+    const mood = parsed.emotion;
+    const clean = parsed.clean;
     if (clean === "") return;
     if (mood) this.hooks.emote(mood);
     this.hooks.send(clean);
     await this.hooks.append("assistant", clean);
-    await this.hooks.speak(clean, mood);
+    await this.hooks.speak(clean, mood ?? undefined);
   }
 
   private async finish(text: string): Promise<void> {

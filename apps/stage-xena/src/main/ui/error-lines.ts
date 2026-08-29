@@ -24,7 +24,6 @@ const BUBBLE: Record<InferenceErrorKind, SurfaceLine | null> = {
   quota: { line: "I've talked myself hoarse today — gimme a minute to catch my breath.", mood: "annoyed" },
   timeout: { line: "That one slipped away from me... ask me again?", mood: "sleepy" },
   empty: { line: "Huh. Nothing came to me just now — try once more?", mood: "surprised" },
-  stt: { line: "I couldn't hear that clearly — try again?", mood: "annoyed" },
   unknown: { line: "Something went sideways in my head. Try again in a moment.", mood: "annoyed" },
 };
 
@@ -39,7 +38,6 @@ const NOTIFY: Record<InferenceErrorKind, string> = {
   quota: "Xena's free AI quota is stretched thin — she'll recover automatically in a few minutes.",
   timeout: "Xena's thoughts are moving slowly — she'll recover on her own.",
   empty: "Xena's providers returned nothing just now — she'll retry automatically.",
-  stt: "Xena couldn't make out the audio.",
   unknown: "Something went wrong in Xena's head — she'll recover on her own.",
 };
 
@@ -49,7 +47,6 @@ const BAR: Record<InferenceErrorKind, string> = {
   quota: "Free AI quota is stretched — try again in a few minutes.",
   timeout: "Took too long — try again.",
   empty: "Got nothing back — try again.",
-  stt: "Couldn't catch that — try again or type it instead.",
   unknown: "That didn't work — try again in a moment.",
 };
 

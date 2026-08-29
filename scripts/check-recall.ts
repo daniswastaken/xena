@@ -39,6 +39,9 @@ async function main(): Promise<void> {
   );
   assert(EMOTIONS.every(isEmotion), "canonical list validates");
   assert(!isEmotion("[angry]") && !isEmotion("angry"), "non-canonical names rejected");
+  const hallucinated = extractEmotion("[bubbly-hope] Ooh, do I know what, Father?");
+  assert(hallucinated.emotion === null, "hallucinated tag drives no emote");
+  assert(hallucinated.clean === "Ooh, do I know what, Father?", "hallucinated leading tag stripped from display");
 
   // --- Presentation cleanup -------------------------------------------------
   const combo = cleanForDisplay("[happy] Use it.");

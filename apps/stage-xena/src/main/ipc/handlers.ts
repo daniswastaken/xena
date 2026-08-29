@@ -15,7 +15,6 @@ import { bubbleLine, errorKind, guidedTaskLine, notifyLine, rawDetail, barLine }
 import { CHANNELS } from "./channels.js";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { GuidedTask, looksLikeGuidedTask } from "../pointer/guided-task.js";
-import { transcribeAudio } from "../voice-input/transcribe.js";
 import type { PointerWindow } from "../window/pointer-window.js";
 import { speakReply } from "../tts/speak.js";
 import type { SettingsStore } from "../settings/store.js";
@@ -130,8 +129,8 @@ export function registerIpcHandlers(
     try {
       const audio = await speakReply(text, mood);
       avatarWin().webContents.send(CHANNELS.ttsAudio, audio);
-    } catch {
-      // Voice is best-effort — never break chat over TTS failure.
+    } catch (err) {
+      console.error(`[tts] maybeSpeak failed: ${(err as Error).message ?? err}`);
     }
   }
 
@@ -333,19 +332,8 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle(CHANNELS.live2dGet, async () => {
-    const { avatarEnabled, live2dModel } = await settings.get();
-    return { enabled: avatarEnabled, model: live2dModel || "hiyori" };
-  });
-
-  ipcMain.handle(CHANNELS.voiceTranscribe, async (_event, audio: unknown) => {
-    if (typeof audio !== "string" || audio.length < 100) throw new Error("no audio");
-    scheduler.noteActivity();
-    try {
-      return await transcribeAudio(audio, config);
-    } catch (error) {
-      console.error(`[inference] transcription failed — ${rawDetail(error)}`);
-      throw new Error(barLine(error));
-    }
+    const { avatarEnabled } = await settings.get();
+    return { enabled: avatarEnabled, model: "mao" };
   });
 
   ipcMain.handle(CHANNELS.getStats, async () => {

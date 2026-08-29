@@ -10,7 +10,6 @@ export type InferenceErrorKind =
   | "quota"
   | "timeout"
   | "empty"
-  | "stt"
   | "unknown";
 
 export class InferenceError extends Error {

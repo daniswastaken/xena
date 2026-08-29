@@ -8,8 +8,6 @@ import type { SettingsStore } from "../settings/store.js";
 import type { BarWindow } from "../window/bar-window.js";
 
 export interface Live2dTrayHooks {
-  /** folder names under assets/live2d/ with a model3.json */
-  live2dModels: string[];
   /** called after any live2d setting change so main can push to renderer */
   onLive2dChange: () => void;
 }
@@ -33,7 +31,7 @@ export function createTray(
   tray.setToolTip("Xena — Ctrl+Alt+X or shake cursor");
 
   const rebuild = async (): Promise<void> => {
-    const { voiceEnabled, proactiveEnabled, shakeEnabled, avatarEnabled, autostartEnabled, ambientEnabled, voiceInputEnabled } =
+    const { voiceEnabled, proactiveEnabled, shakeEnabled, avatarEnabled, autostartEnabled, ambientEnabled } =
       await settings.get();
     const inferenceItems = inference
       ? ([
@@ -97,12 +95,6 @@ export function createTray(
             const next = !autostartEnabled;
             app.setLoginItemSettings({ openAtLogin: next });
             void settings.set({ autostartEnabled: next }).then(() => void rebuild());
-          },
-        },
-        {
-          label: `Voice input (Ctrl+Alt+V): ${voiceInputEnabled ? "ON" : "OFF"}`,
-          click: () => {
-            void settings.set({ voiceInputEnabled: !voiceInputEnabled }).then(() => void rebuild());
           },
         },
         ...inferenceItems,
