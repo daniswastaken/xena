@@ -1,38 +1,49 @@
 /**
- * Router9 connection config.
+ * Provider connection config.
  * Reads .env from the repo root (walks up from cwd) — no dotenv dep needed.
  *
- * Free-only failover: instead of routing to a paid OpenRouter key on 9Router
- * failures, the chain falls through to other 9Router free-tier models within
- * the SAME gateway. All requests stay free and on `oc/*` providers.
+ * Provider priority (primary → secondary → tertiary):
+ *   1. Gemini  — free AI Studio key; text + vision in one model
+ *   2. 9Router — OpenAI-compatible gateway; used for reasoning (oc/big-pickle)
+ *                and as a catch-all free-tier fallback
+ *   3. 9Router free oc/* models — last resort within the same gateway
+ *
+ * Gemini is primary because it's a general-purpose chat model (not a cold coding
+ * model like oc/big-pickle) AND it handles both text and vision in one pool,
+ * so one free key covers two capabilities.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export interface Router9Config {
+  /** 9Router base URL (e.g. http://localhost:20129/v1). */
   baseUrl: string;
+  /** 9Router API key. */
   apiKey: string;
-  /** Primary text model. */
-  textModel: string;
-  /** Primary vision model. */
-  visionModel: string;
-  /** Free 9Router text models tried in order when the primary fails. */
-  fallbackTextModels: string[];
-  /** Free 9Router vision-capable models (incl. text models that accept images). */
-  fallbackVisionModels: string[];
-  /** Google AI Studio free Gemini key — vision fallback only, separate free pool. */
-  geminiApiKey: string | null;
-  /** Gemini vision model id (e.g. gemini-flash-latest). */
+  /** Primary text + chat model (Gemini). */
+  geminiChatModel: string;
+  /** Primary vision model (Gemini — same key, same pool). */
   geminiVisionModel: string;
+  /** Google AI Studio free Gemini key — primary provider. */
+  geminiApiKey: string | null;
+  /** 9Router secondary text model (e.g. oc/big-pickle for reasoning). */
+  textModel: string;
+  /** 9Router secondary vision model. */
+  visionModel: string;
+  /** 9Router free-tier text models as last resort. */
+  fallbackTextModels: string[];
+  /** 9Router free-tier vision-capable models as last resort. */
+  fallbackVisionModels: string[];
 }
 
 const DEFAULTS = {
   baseUrl: "http://localhost:20129/v1",
+  geminiChatModel: "gemini-2.0-flash",
+  geminiVisionModel: "gemini-2.0-flash",
   textModel: "oc/big-pickle",
   visionModel: "oc/x-preview-f-free",
   fallbackTextModels: ["oc/laguna-s-2.1-free", "oc/mimo-v2.5-free"],
   fallbackVisionModels: ["oc/mimo-v2.5-free"],
-  geminiVisionModel: "gemini-flash-latest",
 } as const;
 
 function readDotEnv(): Record<string, string> {
@@ -73,6 +84,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config 
   cached = {
     baseUrl: (env.ROUTER9_BASE_URL ?? file.ROUTER9_BASE_URL ?? DEFAULTS.baseUrl).replace(/\/+$/, ""),
     apiKey,
+    geminiApiKey: env.XENA_GEMINI_API_KEY ?? file.XENA_GEMINI_API_KEY ?? null,
+    geminiChatModel: env.XENA_GEMINI_CHAT_MODEL ?? file.XENA_GEMINI_CHAT_MODEL ?? DEFAULTS.geminiChatModel,
+    geminiVisionModel: env.XENA_GEMINI_VISION_MODEL ?? file.XENA_GEMINI_VISION_MODEL ?? DEFAULTS.geminiVisionModel,
     textModel: env.XENA_TEXT_MODEL ?? file.XENA_TEXT_MODEL ?? DEFAULTS.textModel,
     visionModel: env.XENA_VISION_MODEL ?? file.XENA_VISION_MODEL ?? DEFAULTS.visionModel,
     fallbackTextModels:
@@ -81,8 +95,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Router9Config 
     fallbackVisionModels:
       parseList(env.XENA_FALLBACK_VISION_MODELS ?? file.XENA_FALLBACK_VISION_MODELS) ||
       [...DEFAULTS.fallbackVisionModels],
-    geminiApiKey: env.XENA_GEMINI_API_KEY ?? file.XENA_GEMINI_API_KEY ?? null,
-    geminiVisionModel: env.XENA_GEMINI_VISION_MODEL ?? file.XENA_GEMINI_VISION_MODEL ?? DEFAULTS.geminiVisionModel,
   };
   return cached;
 }

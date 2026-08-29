@@ -6,7 +6,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { ChatMessage } from "@xena/router9-client";
+import type { ChatMessage } from "@xena/inference-gateway";
 
 export interface SessionMeta {
   id: string;

@@ -1,8 +1,12 @@
 /**
  * Provider failover for chat completions.
- * Primary: 9Router. Fallback: OpenRouter (free tier) when the primary is
- * out of quota, unreachable. Streaming restarts from scratch on the fallback
- * only if no token was emitted yet.
+ *
+ * Provider priority (primary → secondary → tertiary):
+ *   1. Gemini       — general-purpose chat model; also handles vision in the same pool
+ *   2. 9Router      — reasoning (oc/big-pickle), catch-all secondary
+ *   3. 9Router free — last resort within the same gateway
+ *
+ * Streaming restarts from scratch on a fallback ONLY if no token was emitted yet.
  */
 import type { Router9Config } from "../config.js";
 import {
@@ -10,16 +14,17 @@ import {
   type ChatCompletionResult,
   type ChatMessage,
 } from "../types.js";
-import { chatComplete, parseCompletionBody } from "./completions.js";
-import { geminiVision } from "../vision/gemini.js";
+import { chatComplete } from "./completions.js";
+import { geminiChat, geminiVision, geminiStreamChat } from "../vision/gemini.js";
 
 export interface ProviderTarget {
   name: string;
   baseUrl: string;
   apiKey: string;
   model: string;
-  /** OpenAI-compatible (9Router) vs native Gemini vision adapter. */
   kind: "openai" | "gemini";
+  /** "text" targets are tried by streamChatFailover; "vision" only by visionCompleteFailover */
+  usage: "text" | "vision";
 }
 
 export interface FailoverChatOptions {
@@ -27,7 +32,7 @@ export interface FailoverChatOptions {
   maxTokens?: number;
   temperature?: number;
   signal?: AbortSignal;
-  /** reasoning-model deltas (arrive before content) */
+  /** Fires when a reasoning-model delta arrives (before content). */
   onReasoning?: (delta: string) => void;
 }
 
@@ -35,14 +40,8 @@ export interface FailoverResult extends ChatCompletionResult {
   providerUsed: string;
 }
 
-/** Errors worth trying the next provider for: quota, auth, rate limit, upstream outage. */
 const RETRYABLE_STATUSES = new Set([401, 402, 403, 404, 408, 429, 500, 502, 503, 504]);
 
-/**
- * Circuit breaker: when the fallback ALSO fails with quota/pressure errors,
- * skip it for a cooldown so every request doesn't pay the double-timeout.
- * Module-level on purpose — one breaker per process.
- */
 let fallbackPenaltyUntil = 0;
 const FALLBACK_PENALTY_MS = 5 * 60_000;
 
@@ -58,134 +57,69 @@ function clearFallbackPenalty(): void {
   fallbackPenaltyUntil = 0;
 }
 
-/**
- * Chain: primary 9Router model first, then the free 9Router fallback model pool.
- * All targets hit the same gateway (config.baseUrl) with the same key —
- * failover is free-to-free within the 9Router free tier, no paid provider.
- */
-export function buildProviderChain(config: Router9Config, modelOverride?: string): ProviderTarget[] {
-  const chain: ProviderTarget[] = [
-    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: modelOverride ?? config.textModel, kind: "openai" },
-  ];
-  for (const model of config.fallbackTextModels) {
-    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai" });
-  }
-  return chain;
-}
-
-/**
- * Vision chain: primary 9Router vision model first, then the free fallback
- * vision-capable models (including text models that accept images — probed
- * and cached in docs/vision-models.md). All on the same 9Router gateway.
- */
-export function buildVisionChain(config: Router9Config): ProviderTarget[] {
-  const chain: ProviderTarget[] = [
-    { name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.visionModel, kind: "openai" },
-  ];
-  // Gemini (separate free pool) as the first vision fallback — usually more
-  // reliable than 9Router's free mimo model.
-  if (config.geminiApiKey) {
-    chain.push({ name: "gemini", baseUrl: "", apiKey: "", model: config.geminiVisionModel, kind: "gemini" });
-  }
-  for (const model of config.fallbackVisionModels) {
-    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai" });
-  }
-  return chain;
-}
-
 function isFailoverWorthy(error: unknown): boolean {
   if (error instanceof Router9Error) return RETRYABLE_STATUSES.has(error.status);
-  if (error instanceof TypeError) return true; // fetch network failure / DNS / refused
-  // Timeouts (AbortSignal.timeout / controller abort) — next provider may be faster.
+  if (error instanceof TypeError) return true;
   if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return true;
   return false;
 }
 
-interface RawChoice {
-  message?: { content?: string | null; reasoning_content?: string | null };
-  finish_reason?: string | null;
+/** Text chain: Gemini → 9Router primary → 9Router free fallbacks. */
+export function buildProviderChain(config: Router9Config): ProviderTarget[] {
+  const chain: ProviderTarget[] = [];
+  if (config.geminiApiKey) {
+    chain.push({ name: "gemini", baseUrl: "", apiKey: "", model: config.geminiChatModel, kind: "gemini", usage: "text" });
+  }
+  chain.push({ name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.textModel, kind: "openai", usage: "text" });
+  for (const model of config.fallbackTextModels) {
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai", usage: "text" });
+  }
+  return chain;
 }
 
-interface RawResponse {
-  id?: string;
-  model?: string;
-  choices?: RawChoice[];
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null;
+/** Vision chain: Gemini → 9Router primary → 9Router free fallbacks. */
+export function buildVisionChain(config: Router9Config): ProviderTarget[] {
+  const chain: ProviderTarget[] = [];
+  if (config.geminiApiKey) {
+    chain.push({ name: "gemini", baseUrl: "", apiKey: "", model: config.geminiVisionModel, kind: "gemini", usage: "vision" });
+  }
+  chain.push({ name: "router9", baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.visionModel, kind: "openai", usage: "vision" });
+  for (const model of config.fallbackVisionModels) {
+    chain.push({ name: "router9-fb", baseUrl: config.baseUrl, apiKey: config.apiKey, model, kind: "openai", usage: "vision" });
+  }
+  return chain;
 }
 
-function toResult(raw: RawResponse, requestedModel: string, providerUsed: string): FailoverResult {
-  const msg = raw.choices?.[0]?.message;
-  return {
-    id: raw.id ?? "",
-    model: raw.model ?? requestedModel,
-    content: typeof msg?.content === "string" ? msg.content : "",
-    reasoning: msg?.reasoning_content ?? null,
-    finishReason: raw.choices?.[0]?.finish_reason ?? null,
-    usage: raw.usage
-      ? {
-          promptTokens: raw.usage.prompt_tokens ?? 0,
-          completionTokens: raw.usage.completion_tokens ?? 0,
-          totalTokens: raw.usage.total_tokens ?? 0,
-        }
-      : null,
-    providerUsed,
-  };
-}
-
-async function completeOn(
+async function completeOnTarget(
   target: ProviderTarget,
   messages: ChatMessage[],
   options: FailoverChatOptions,
+  config: Router9Config,
 ): Promise<FailoverResult> {
-    const attempt = async (): Promise<FailoverResult> => {
-      const res = await fetch(`${target.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${target.apiKey}` },
-        body: JSON.stringify({
-          model: target.model,
-          messages,
-          max_tokens: options.maxTokens ?? 512,
-          ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-        }),
-        signal: options.signal,
-      });
-      if (!res.ok) throw new Router9Error(res.statusText, res.status, (await res.text()).slice(0, 800));
-      const raw = parseCompletionBody(await res.text());
-      const result = toResult(raw, target.model, target.name);
-      // Upstream can return HTTP 200 with an empty body under load — treat as
-      // transient failure so the next provider gets its chance.
-      if (result.content.trim() === "") {
-        throw new Router9Error("provider returned empty completion", 502, "");
-      }
-      return result;
-    };
-    try {
-      return await attempt();
-    } catch (error) {
-      // Empty completion is a "provider woke up mid-load" blip, not a real
-      // rejection. Share one gateway with the whole chain, so retry the SAME
-      // provider once before bothering the other models — usually succeeds.
-      if (
-        options.signal?.aborted ||
-        !(error instanceof Router9Error) ||
-        error.status !== 502 ||
-        !/empty completion/i.test(error.message)
-      ) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1_200));
-      if (options.signal?.aborted) throw error;
-      return attempt();
-    }
+  if (target.kind === "gemini" && target.usage === "text") {
+    const result = await geminiChat(messages, options, config);
+    return { ...result, providerUsed: target.name };
   }
+  if (target.kind === "gemini" && target.usage === "vision") {
+    const result = await geminiVision(messages, options, config);
+    return { ...result, providerUsed: target.name };
+  }
+  // openai / router9 path
+  const result = await chatComplete(
+    messages,
+    { model: target.model, maxTokens: options.maxTokens, temperature: options.temperature, signal: options.signal, baseUrl: target.baseUrl, apiKey: target.apiKey },
+    config,
+  );
+  return { ...result, providerUsed: target.name };
+}
 
-/** Non-streaming completion with automatic provider failover. */
+/** Non-streaming completion with automatic provider failover (text). */
 export async function chatCompleteFailover(
   messages: ChatMessage[],
   options: FailoverChatOptions,
   config: Router9Config,
 ): Promise<FailoverResult> {
-  return completeWalk(buildProviderChain(config, options.model), messages, options, config);
+  return completeWalk(buildProviderChain(config), messages, options, config);
 }
 
 /** Non-streaming vision completion with automatic provider failover. */
@@ -206,10 +140,9 @@ async function completeWalk(
   let lastError: unknown;
   for (let i = 0; i < chain.length; i++) {
     const target = chain[i]!;
-    if (i > 0 && fallbackUnderPenalty()) break; // breaker open — fail fast
+    if (i > 0 && fallbackUnderPenalty()) break;
     try {
-      const result =
-        target.kind === "gemini" ? await geminiVision(messages, options, config) : await completeOn(target, messages, options);
+      const result = await completeOnTarget(target, messages, options, config);
       if (i > 0) clearFallbackPenalty();
       return result;
     } catch (error) {
@@ -222,32 +155,39 @@ async function completeWalk(
   throw lastError instanceof Error ? lastError : new Router9Error("all providers failed", 0, "");
 }
 
-/** Streaming completion with pre-stream provider failover. */
+/** Streaming completion with pre-stream provider failover (text only). */
 export async function streamChatFailover(
   messages: ChatMessage[],
   options: FailoverChatOptions,
   onToken: (delta: string) => void,
   config: Router9Config,
 ): Promise<{ full: string; providerUsed: string }> {
-  const chain = buildProviderChain(config, options.model);
+  const chain = buildProviderChain(config);
   let lastError: unknown;
   for (let i = 0; i < chain.length; i++) {
     const target = chain[i]!;
-    if (i > 0 && fallbackUnderPenalty()) break; // breaker open — fail fast
+    if (i > 0 && fallbackUnderPenalty()) break;
     let emitted = false;
     const guardedToken = (delta: string): void => {
       emitted = true;
       onToken(delta);
     };
     try {
-      const full = await streamOn(target, messages, { ...options, onReasoning: (r) => options.onReasoning?.(r) }, guardedToken);
+      let full: string;
+      let providerUsed: string;
+      if (target.kind === "gemini" && target.usage === "text") {
+        full = await geminiStreamChat(messages, options, config, guardedToken);
+        providerUsed = target.name;
+      } else {
+        full = await streamOn(target, messages, options, guardedToken);
+        providerUsed = target.name;
+      }
       if (i > 0) clearFallbackPenalty();
-      return { full, providerUsed: target.name };
+      return { full, providerUsed };
     } catch (error) {
       lastError = error;
       const status = error instanceof Router9Error ? error.status : null;
       if (i > 0 && !emitted && (status === 429 || status === 502 || status === 503)) penalizeFallback();
-      // Never restart a stream the user already saw tokens from.
       if (emitted || options.signal?.aborted || !isFailoverWorthy(error) || i === chain.length - 1) throw error;
     }
   }
@@ -296,7 +236,7 @@ async function streamOn(
         onToken(delta);
       }
     } catch {
-      // tolerate keep-alive noise between events
+      /* tolerate keep-alive noise between events */
     }
   };
 
@@ -311,23 +251,6 @@ async function streamOn(
       if (line.startsWith("data:")) handlePayload(line.slice(5).trim());
     }
   }
-  // Upstream sometimes returns a non-SSE JSON body despite stream:true.
-  if (full === "" && buffer.trim() !== "") {
-    try {
-      const raw = JSON.parse(buffer.trim()) as RawResponse;
-      const content =
-        typeof raw.choices?.[0]?.message?.content === "string"
-          ? raw.choices[0]!.message!.content!
-          : "";
-      if (content) {
-        full = content;
-        onToken(content);
-      }
-    } catch {
-      /* nothing salvageable */
-    }
-  }
   if (full === "") throw new Router9Error("provider returned empty stream", 502, "");
   return full;
 }
-

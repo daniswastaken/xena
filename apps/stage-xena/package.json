@@ -1,6 +1,6 @@
 {
   "name": "@xena/stage-xena",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "commonjs",
   "description": "Xena desktop overlay app (Electron)",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@pixi/unsafe-eval": "^6.5.10",
+    "@xena/inference-gateway": "workspace:*",
     "@xena/router9-client": "workspace:*",
     "@xena/tts": "workspace:*",
     "@xena/xena-core": "workspace:*",

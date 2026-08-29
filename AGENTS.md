@@ -11,8 +11,8 @@ A Neuro-sama-inspired AI desktop companion scoped to a **bottom-right corner Liv
 - Replies render in a **mood-tinted speech bubble anchored to Mao's head** inside the avatar window
 - The avatar *talks* — mouth flap synced to the TTS audio duration, per-mood expression ALTERNATES, gaze tracking on the cursor
 - The companion *sees* on command (`/look <question>`), *remembers* (SQLite transcripts + JSON diary + facts store + keyword+recency recall), and occasionally *initiates* (proactive idle comments, ambient screen glances)
-- Voice input via push-to-talk (`Ctrl+Alt+V`) — mic → WAV → free `gpt-audio-mini` transcription → auto-sent as chat
-- All inference is **remote** through 9Router (port `20129`); 9Router is the only AI gateway Xena uses, with a free `oc/*` fallback chain for both text and vision
+- Voice input via push-to-talk (`Ctrl+Alt+V`) — mic → WAV → Gemini inline-audio transcription (9Router gpt-audio secondary) → auto-sent as chat
+- All inference is **remote**, orchestrated by `packages/inference-gateway`: Gemini flash primary (text + vision + STT, one free key) → flash-lite → 9Router rungs (spawned/supervised by Xena) → keyless Pollinations last resort. Self-recovery at model/provider/process level; raw provider errors never reach the bubble (ADR-004)
 
 **Not** a goal (scope discipline): full Live2D authoring pipeline, real-time stream interaction, singing, multi-channel chatbots. The corner-overlay form factor and the "weak-laptop-no-GPU" constraint are permanent.
 
@@ -32,28 +32,24 @@ Implications:
 
 ## Infrastructure Already In Place (do not re-create)
 
-### 9Router — primary AI gateway (already installed & configured)
-- npm global package `9router` v0.5.55 on Node 26
-- **Always runs on port 20129** (20128 is reserved for OmniRoute, another router the user keeps)
-- OpenAI-compatible endpoint: `http://localhost:20129/v1`
-- API key: `sk-2143c08449a11de2-r8roza-89b030fa`
-- ~700 models exposed; the free tier that matters in production:
-  - `oc/big-pickle` — primary text/reasoning (exposes `reasoning_content`)
-  - `oc/x-preview-f-free` — primary vision (upstream `mimo-v2.5-free`)
-  - `oc/laguna-s-2.1-free` — text + vision fallback
-  - `oc/mimo-v2.5-free` — text + vision fallback
-  - `tokenrouter/openai/gpt-audio-mini` — STT for push-to-talk
-- List all models:
-  ```powershell
-  Invoke-RestMethod -Uri "http://localhost:20129/v1/models" -Headers @{ Authorization = "Bearer sk-2143c08449a11de2-r8roza-89b030fa" }
-  ```
-- Smoke test:
-  ```powershell
-  $body = '{"model":"oc/big-pickle","messages":[{"role":"user","content":"Say OK"}],"max_tokens":200}'
-  Invoke-RestMethod -Uri "http://localhost:20129/v1/chat/completions" -Method Post -Body $body -ContentType "application/json" -Headers @{ Authorization = "Bearer sk-2143c08449a11de2-r8roza-89b030fa" }
-  ```
-- Dashboard: `http://localhost:20129/dashboard` (password `123456`) — only if provider changes are needed
-- Server is started **manually** by the user (profile function injects `--port 20129 --no-browser --skip-update`). If `/v1/models` fails, tell the user to run `9router` — do not try to start it yourself silently.
+### Inference chain — `packages/inference-gateway` (ADR-004)
+Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one key covers text + vision + STT) → `gemini-2.5-flash-lite` (higher free RPD) → **9Router** `oc/big-pickle` + `oc/*` free models (reasoning rung) → **Pollinations** `openai-fast` (keyless final net). Vision: same Gemini rungs → 9Router `oc/x-preview-f-free` → `oc/mimo-v2.5-free`.
+- `apps/*` import `@xena/inference-gateway`; the gateway is the only `router9-client` consumer. Renderer never fetches directly.
+- Self-recovery: 404/empty evicts a model 10 min; 3 consecutive provider failures = 5-min offline; total-chain collapse auto-resets the supervisor; tray has "Restart inference" (never restarts Xena).
+- Errors classify into `InferenceError` kinds; main maps them to persona lines (`main/ui/error-lines.ts`) — raw provider text only ever reaches console + tray diagnostics.
+
+### 9Router — local gateway (now a supervised child, not a manual prerequisite)
+- npm global `9router` v0.5.55; port `20129` (20128 reserved for OmniRoute, unused by Xena)
+- OpenAI-compatible `http://localhost:20129/v1`; key in `.env` (`ROUTER9_API_KEY`)
+- **Xena spawns it at boot** (`NineRouterChild`: `--port 20129 --no-browser --skip-update`, 60s health probes, 5s→30s respawn backoff, tree-kill on quit). An already-running instance is adopted, never double-spawned, never killed.
+- Disable the rung entirely: `XENA_NINEROUTER_ENABLED=0` in `.env` (pure Gemini + Pollinations stack)
+- Free models in production: `oc/big-pickle` (reasoning, `reasoning_content`), `oc/x-preview-f-free` (vision), `oc/laguna-s-2.1-free`, `oc/mimo-v2.5-free`, `tokenrouter/openai/gpt-audio-mini` (STT secondary)
+- Dashboard: `http://localhost:20129/dashboard` (password `123456`) — only for provider changes
+- If `/v1/models` fails while Xena runs: the child supervisor handles respawn; no agent action needed. Outside the app, the user may still start `9router` manually.
+
+### Gemini — primary provider
+- Free AI Studio key in `.env` (`XENA_GEMINI_API_KEY`). Models: `gemini-2.5-flash` (chat + vision + STT), `gemini-2.5-flash-lite` (overflow rung).
+- Health is inferred from request outcomes only — never probe Gemini for liveness (free-tier etiquette).
 
 ### OmniRoute — secondary router (exists, do not touch)
 - Port 20128, own key store. Xena does not use it.
@@ -111,11 +107,19 @@ project-xena/
 │           │   └── PROVENANCE.txt        # Live2D Free Material License
 │           └── vendor/live2dcubismcore.min.js
 ├── packages/
-│   ├── router9-client/                   # ALL 9Router API code lives here, nowhere else
-│   │   ├── src/chat/                     # completions, streaming, failover
-│   │   ├── src/vision/                   # image messages, screenshot encode, failover
-│   │   ├── src/models/                   # model registry, capability probes
-│   │   └── src/types.ts                  # shared API types
+│   ├── inference-gateway/               # ALL inference orchestration lives here (ADR-004)
+│   │   ├── src/adapters/               # gemini + openai-compatible transports
+│   │   ├── src/chain.ts                # rung walk, failover, error classification
+│   │   ├── src/supervisor.ts           # provider/model health, evictions, resetInference()
+│   │   ├── src/child9router.ts         # spawn/adopt/probe/respawn the 9router child
+│   │   ├── src/stt.ts                  # Gemini inline-audio + gpt-audio chain
+│   │   ├── src/errors.ts               # InferenceError kinds (bubble never sees raw)
+│   │   └── src/config.ts               # .env load, chain-order config
+│   ├── router9-client/                 # pure 9Router wire transport + shared API types
+│   │   ├── src/chat/                   # completions, streaming, defensive body parsing
+│   │   ├── src/vision/                 # image message shapes
+│   │   ├── src/models/                 # model registry
+│   │   └── src/types.ts                # shared API types
 │   ├── xena-core/                        # persona, memory, conversation state
 │   │   ├── src/persona/                  # system prompt, emotion protocol
 │   │   ├── src/memory/                   # SQLite store, recall, facts, diary
@@ -136,7 +140,7 @@ project-xena/
 Rules:
 - `pnpm` workspaces (`pnpm-workspace.yaml`) from day one
 - `apps/*` may import `packages/*`; **packages must never import apps**
-- Renderer never calls `fetch` directly — always through `router9-client` over IPC
+- Renderer never calls `fetch` directly — always through `@xena/inference-gateway` over IPC
 - One responsibility per module; if a file exceeds ~200 lines and mixes concerns, split it
 - TypeScript everywhere, strict mode, no `any` unless justified in a comment
 - Named exports only (except entry points); PascalCase components, camelCase functions, kebab-case non-component filenames
@@ -145,7 +149,7 @@ Rules:
 
 ## Architecture — Stack & Runtime Behavior
 
-Baseline: **Electron + 9Router API** + **pixi.js / pixi-live2d-display** (Mao) + **MsEdgeTTS** (free Edge read-aloud, no key) + **node:sqlite** (Node 24 in Electron 44, zero native deps) for transcripts.
+Baseline: **Electron + inference-gateway** (Gemini primary, 9Router child, Pollinations net — ADR-004) + **pixi.js / pixi-live2d-display** (Mao) + **MsEdgeTTS** (free Edge read-aloud, no key) + **node:sqlite** (Node 24 in Electron 44, zero native deps) for transcripts.
 
 Two Electron windows:
 1. **Avatar window** — bottom-right, transparent, always-on-top, click-through by default, hosts the Live2D stage and the speech-bubble answer surface
@@ -158,7 +162,8 @@ Decision authority (the kinds of choices that have already been made and shouldn
 - Voice: JP `Nanami` only (sole voice, picker was removed); always the "happy" read regardless of face mood; 96 kbit endpoint max
 - Mood tags: model leads with one of `[happy] [smug] [surprised] [annoyed] [sleepy]`, parsed in main, stripped from speech/UI, drives face + drives TTS prosody
 - Streaming: never restart after the first token, even across a failover hop
-- Failover: 9Router primary → free `oc/*` fallbacks; circuit breaker opens for 5 min after a quota failure on a fallback
+- Failover: Gemini flash → flash-lite → 9Router `oc/*` → Pollinations; 404/empty evicts a model 10 min, 3 provider failures = 5-min offline, chain collapse auto-resets
+- Errors: classified `InferenceError` kinds mapped to persona lines before IPC — raw provider text never reaches bubble/bar/toast (tray + console only)
 - Reasoning: `oc/big-pickle` exposes `reasoning_content`; show animated thinking dots in the bubble while it streams
 
 If a change implies a stack decision, follow the Source Layout expansion rules and explain the choice in a commit message or a short ADR under `docs/`.
@@ -180,12 +185,12 @@ When the user supplies a different/upgraded Live2D model it replaces Mao one-to-
 | Speech-bubble answer surface | ✓ | mood-tinted, anchored to head, thinking dots, hover-scroll/select/copy |
 | Summon bar (input) | ✓ | Ctrl+Alt+X, cursor-shake, Esc dismiss, input history (↑/↓, last 20), message queue |
 | Streaming text + token-flap | ✓ | never restart after first token, even across failover |
-| Provider failover (text + vision) | ✓ | 9Router primary, `oc/*` chain, 5-min circuit breaker |
-| Vision on command (`/look`) | ✓ | desktopCapturer → JPEG → `oc/x-preview-f-free` → correct on-screen description |
+| Provider failover (text + vision) | ✓ | Gemini primary, flash-lite, 9Router `oc/*`, keyless Pollinations; eviction + breakers (ADR-004) |
+| Vision on command (`/look`) | ✓ | desktopCapturer → JPEG → Gemini vision chain → correct on-screen description |
 | Ambient screen glances | ✓ | opt-in, default OFF, 30 min cadence, quiet-hours gated |
 | Guided tasks | ✓ | natural-language "how do I…?" → vision-driven multi-step tutor + AI Pointer |
 | Edge TTS | ✓ | JP Nanami, mouth flap synced to audio duration, ON/OFF in tray |
-| Voice input (push-to-talk) | ✓ | `Ctrl+Alt+V`, mic → WAV → `gpt-audio-mini` → auto-submit |
+| Voice input (push-to-talk) | ✓ | `Ctrl+Alt+V`, mic → WAV → Gemini inline audio (gpt-audio secondary) → auto-submit |
 | Memory | ✓ | SQLite transcripts, JSON diary, facts store, keyword+recency recall |
 | Proactive idle comments | ✓ | 45 min idle, cooldown, quiet-hours gate, tray toggle |
 | Single-instance lock | ✓ | |
@@ -201,9 +206,10 @@ Memory line:
 
 ## ADRs (decisions worth keeping)
 
-- `docs/adr-001-failover-recall.md` — 9Router primary + free `oc/*` failover chain; keyword+recency recall
+- `docs/adr-001-failover-recall.md` — failover chain concept + keyword+recency recall (chain ordering superseded by ADR-004)
 - `docs/adr-002-live2d-pointer.md` — Mao as sole Live2D; AI Pointer window for guided tasks
 - `docs/adr-003-speech-bubble.md` — bubble replaces the chat window; mood-tinted, anchored to head
+- `docs/adr-004-inference-gateway.md` — inference gateway package; Gemini-primary chain; self-recovery layers; error surface boundary
 
 If you make a new architectural decision (new package, new window, new IPC contract, new model selection strategy), drop a one-page ADR in `docs/adr-NNN-short-slug.md` and reference it from the table above.
 
@@ -216,7 +222,7 @@ If you make a new architectural decision (new package, new window, new IPC contr
 5. The user's laptop is weak: after changes, sanity-check the app memory footprint stays under ~300 MB.
 6. PowerShell 5.1 syntax only in shell commands (no `&&`; use `;` or `if ($?) {}`).
 7. Never hardcode the API key outside config — read from `.env` or a config file. The seed key in `.env` is fine; do **not** put it in code.
-8. If 9Router is down, say so plainly and ask the user to start it. Do not install alternative routers.
+8. 9Router is Xena's supervised child: if it stays down, say so plainly (the supervisor already retries; `Restart inference` lives in the tray). Do not install alternative routers.
 9. Never delete or replace the Mao model. New Live2D models go in a sibling directory; the renderer picks by config.
 10. When in doubt about an architectural decision, write a one-page ADR before writing the code.
 
@@ -228,10 +234,11 @@ pnpm build         # bundle the app
 pnpm start         # run the Electron overlay
 pnpm typecheck     # all packages, strict TS
 node scripts/run-check.mjs scripts/check-recall.ts   # offline core checks
+node scripts/run-check.mjs scripts/check-child9router.ts  # child lifecycle checks
 ```
 
-Test 9Router reachability:
+Test 9Router reachability (it should be up whenever Xena runs):
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:20129/v1/models" -Headers @{ Authorization = "Bearer sk-2143c08449a11de2-r8roza-89b030fa" }
+Invoke-RestMethod -Uri "http://localhost:20129/v1/models"
 ```

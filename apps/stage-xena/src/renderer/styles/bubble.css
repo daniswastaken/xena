@@ -132,18 +132,6 @@
   }
 }
 
-/* Provider fallback note. */
-#bubble-provider {
-  font-size: 10px;
-  opacity: 0.4;
-  padding-top: 6px;
-  text-align: right;
-}
-
-#bubble-provider.hidden {
-  display: none;
-}
-
 /* Copy button. */
 #bubble-copy {
   align-self: flex-end;

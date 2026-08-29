@@ -31,6 +31,9 @@ importers:
       '@pixi/unsafe-eval':
         specifier: ^6.5.10
         version: 6.5.10(@pixi/core@6.5.10(@pixi/constants@6.5.10)(@pixi/extensions@6.5.10)(@pixi/math@6.5.10)(@pixi/runner@6.5.10)(@pixi/settings@6.5.10(@pixi/constants@6.5.10))(@pixi/ticker@6.5.10(@pixi/extensions@6.5.10)(@pixi/settings@6.5.10(@pixi/constants@6.5.10)))(@pixi/utils@6.5.10(@pixi/constants@6.5.10)(@pixi/settings@6.5.10(@pixi/constants@6.5.10))))
+      '@xena/inference-gateway':
+        specifier: workspace:*
+        version: link:../../packages/inference-gateway
       '@xena/router9-client':
         specifier: workspace:*
         version: link:../../packages/router9-client
@@ -63,6 +66,16 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  packages/inference-gateway:
+    dependencies:
+      '@xena/router9-client':
+        specifier: workspace:*
+        version: link:../router9-client
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/router9-client:
     devDependencies:
       typescript:
@@ -81,9 +94,9 @@ importers:
 
   packages/xena-core:
     dependencies:
-      '@xena/router9-client':
+      '@xena/inference-gateway':
         specifier: workspace:*
-        version: link:../router9-client
+        version: link:../inference-gateway
     devDependencies:
       typescript:
         specifier: ^5.9.2

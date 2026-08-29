@@ -6,8 +6,8 @@
  */
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { chatCompleteFailover } from "@xena/router9-client";
-import type { Router9Config } from "@xena/router9-client";
+import { chatCompleteFailover } from "@xena/inference-gateway";
+import type { InferenceConfig } from "@xena/inference-gateway";
 import { buildSystemPrompt } from "../persona/prompt.js";
 import type { MemoryStore, StoredTranscript } from "./store.js";
 
@@ -29,7 +29,7 @@ export class Diary {
   /** Summarizes a finished session into its diary file. Returns the path or null. */
   async writeForSession(
     sessionId: string,
-    config: Router9Config,
+    config: InferenceConfig,
   ): Promise<string | null> {
     const transcript = await this.store.load(sessionId);
     if (!transcript || transcript.messages.length < 4) return null;

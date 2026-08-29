@@ -6,7 +6,7 @@
  */
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { visionCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { visionCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
 import { buildSystemPrompt, extractEmotion, extractFactTags } from "@xena/xena-core";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
@@ -23,7 +23,7 @@ export class GlanceTimer {
 
   constructor(
     private readonly getWindow: () => Electron.BrowserWindow,
-    private readonly config: Router9Config,
+    private readonly config: InferenceConfig,
     private readonly isEnabled: () => Promise<boolean>,
     private readonly isBusy: () => boolean,
     private readonly onSpeak: (text: string, mood?: string) => Promise<void>,

@@ -20,11 +20,10 @@ export interface XenaApi {
    clearChat(): Promise<void>;
    remember(text: string): Promise<string>;
    forget(text: string): Promise<string>;
-  onChatToken(callback: (fullText: string) => void): () => void;
-  onChatDone(callback: () => void): () => void;
-   onChatError(callback: (message: string) => void): () => void;
-   onChatProvider(callback: (provider: string) => void): () => void;
-   onChatThinking(callback: (active: boolean) => void): () => void;
+   onChatToken(callback: (fullText: string) => void): () => void;
+   onChatDone(callback: () => void): () => void;
+    onChatError(callback: (payload: { line: string; kind: string }) => void): () => void;
+    onChatThinking(callback: (active: boolean) => void): () => void;
   askVision(question: string): Promise<string>;
    onTtsAudio(callback: (base64Mp3: string) => void): () => void;
    onProactive(callback: (text: string) => void): () => void;
@@ -68,14 +67,9 @@ const api: XenaApi = {
     return () => ipcRenderer.removeListener(CHANNELS.chatDone, listener);
   },
   onChatError: (callback) => {
-    const listener = (_: unknown, message: string): void => callback(message);
+    const listener = (_: unknown, payload: { line: string; kind: string }): void => callback(payload);
     ipcRenderer.on(CHANNELS.chatError, listener);
     return () => ipcRenderer.removeListener(CHANNELS.chatError, listener);
-  },
-  onChatProvider: (callback) => {
-    const listener = (_: unknown, provider: string): void => callback(provider);
-    ipcRenderer.on(CHANNELS.chatProvider, listener);
-    return () => ipcRenderer.removeListener(CHANNELS.chatProvider, listener);
   },
   onChatThinking: (callback) => {
     const listener = (_: unknown, active: boolean): void => callback(active);

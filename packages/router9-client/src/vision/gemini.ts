@@ -1,10 +1,13 @@
 /**
- * Google AI Studio Gemini vision adapter — a separate free pool used as a
- * vision fallback. Gemini uses its own `contents`/`inlineData` format (not
- * OpenAI-compatible), so we translate OpenAI `ChatMessage`s here and map the
- * response back to the shared `FailoverResult` shape.
+ * Google AI Studio Gemini adapter — primary provider for both text and vision.
  *
- * Vision model: `gemini-flash-latest` (AI Studio free tier, 1M context).
+ * Gemini is primary because:
+ * 1. It's a general-purpose chat model (not a cold coding model like
+ *    oc/big-pickle) — better for conversational tone and 1-sentence replies
+ * 2. One free key covers both text AND vision in the same pool
+ *
+ * Gemini uses its own `contents`/`inlineData` format (not OpenAI-compatible),
+ * so we translate here and map back to the shared `FailoverResult` shape.
  */
 import type { Router9Config } from "../config.js";
 import { Router9Error, type ChatMessage } from "../types.js";
@@ -25,6 +28,15 @@ interface GemResponse {
   model?: string;
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
   error?: { code?: number; message?: string };
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
+
+interface GemStreamChunk {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
@@ -67,18 +79,18 @@ function toGeminiMessages(messages: ChatMessage[]): { systemText: string | null;
   return { systemText, contents };
 }
 
-export async function geminiVision(
+async function geminiGenerate(
   messages: ChatMessage[],
   options: FailoverChatOptions,
-  config: Router9Config,
+  model: string,
+  apiKey: string,
+  hasImages: boolean,
 ): Promise<FailoverResult> {
-  if (!config.geminiApiKey) throw new Router9Error("gemini not configured", 0, "");
-  const model = config.geminiVisionModel;
   const { systemText, contents } = toGeminiMessages(messages);
   const body: Record<string, unknown> = { contents };
   if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
   body.generationConfig = { maxOutputTokens: options.maxTokens ?? 700 };
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -104,8 +116,6 @@ export async function geminiVision(
   if (raw.error) throw new Router9Error(raw.error.message ?? "gemini error", raw.error.code ?? 500, text.slice(0, 800));
 
   const content = raw.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  // Gemini can return HTTP 200 with an empty candidate under load — treat as
-  // transient so the next fallback (or a retry) gets its chance.
   if (content.trim() === "") throw new Router9Error("gemini returned empty completion", 502, text.slice(0, 300));
 
   const u = raw.usageMetadata;
@@ -122,6 +132,82 @@ export async function geminiVision(
           totalTokens: u.totalTokenCount ?? 0,
         }
       : null,
-    providerUsed: "gemini",
+    providerUsed: hasImages ? "gemini-vision" : "gemini",
   };
+}
+
+/** Non-streaming Gemini chat completion (text-only messages). */
+export async function geminiChat(
+  messages: ChatMessage[],
+  options: FailoverChatOptions,
+  config: Router9Config,
+): Promise<FailoverResult> {
+  if (!config.geminiApiKey) throw new Router9Error("gemini not configured", 0, "");
+  return geminiGenerate(messages, options, config.geminiChatModel, config.geminiApiKey, false);
+}
+
+/** Non-streaming Gemini vision completion (messages may contain images). */
+export async function geminiVision(
+  messages: ChatMessage[],
+  options: FailoverChatOptions,
+  config: Router9Config,
+): Promise<FailoverResult> {
+  if (!config.geminiApiKey) throw new Router9Error("gemini not configured", 0, "");
+  return geminiGenerate(messages, options, config.geminiVisionModel, config.geminiApiKey, true);
+}
+
+/** Streaming Gemini chat completion (text-only, SSE). */
+export async function geminiStreamChat(
+  messages: ChatMessage[],
+  options: FailoverChatOptions,
+  config: Router9Config,
+  onToken: (delta: string) => void,
+): Promise<string> {
+  if (!config.geminiApiKey) throw new Router9Error("gemini not configured", 0, "");
+  const { systemText, contents } = toGeminiMessages(messages);
+  const body: Record<string, unknown> = { contents };
+  if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
+  body.generationConfig = {
+    maxOutputTokens: options.maxTokens ?? 512,
+    ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+  };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.geminiChatModel}:streamGenerateContent?key=${config.geminiApiKey}&alt=sse`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: options.signal,
+  });
+  if (!res.ok) throw new Router9Error(res.statusText, res.status, (await res.text()).slice(0, 800));
+  if (!res.body) throw new Router9Error("empty response body", res.status, "");
+
+  let full = "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line) continue;
+      try {
+        const chunk = JSON.parse(line) as GemStreamChunk;
+        const text = chunk.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+        if (text) {
+          full += text;
+          onToken(text);
+        }
+      } catch {
+        /* tolerate non-JSON SSE noise */
+      }
+    }
+  }
+  if (full === "") throw new Router9Error("gemini stream returned empty", 502, "");
+  return full;
 }

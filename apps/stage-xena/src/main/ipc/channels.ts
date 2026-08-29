@@ -6,7 +6,6 @@ export const CHANNELS = {
   chatToken: "chat:token",
   chatDone: "chat:done",
   chatError: "chat:error",
-  chatProvider: "chat:provider",
   chatThinking: "chat:thinking",
   chatAbort: "chat:abort",
   chatClear: "chat:clear",

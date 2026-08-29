@@ -1,0 +1,21 @@
+{
+  "name": "@xena/inference-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project Xena inference orchestrator — provider chains, failover, self-recovery",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./errors": "./src/errors.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xena/router9-client": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

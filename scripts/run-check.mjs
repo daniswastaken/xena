@@ -18,6 +18,7 @@ if (!entry) {
 
 const alias = {
   "@xena/router9-client": join(root, "packages/router9-client/src/index.ts"),
+  "@xena/inference-gateway": join(root, "packages/inference-gateway/src/index.ts"),
   "@xena/xena-core": join(root, "packages/xena-core/src/index.ts"),
   "@xena/tts": join(root, "packages/tts/src/index.ts"),
 };

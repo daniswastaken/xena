@@ -9,7 +9,6 @@ import { xena } from "./composables/use-xena-api.js";
 import { cleanForDisplay } from "@xena/xena-core/persona";
 import {
   showBubble,
-  setProviderNote,
   setThinking,
   setMood,
   scheduleBubbleFade,
@@ -148,25 +147,24 @@ xena.onChatThinking((active) => {
   if (active) setThinking(true);
 });
 
-xena.onChatProvider((p) => setProviderNote(p));
-
 xena.onChatDone(() => {
   clearFallbackTimer();
-  if (ttsPlaying || audioPending) {
-    // Audio is playing or on its way over IPC — hold until onplay / stop handles it.
-    return;
-  }
-  // Fallback: if voice is disabled or TTS audio doesn't arrive within 1200ms, reveal text.
+  // Grace window: if TTS `start` fires within 5 s, it reveals the text in
+  // sync with the audio. If TTS never starts (voice disabled, or Edge TTS
+  // failed mid-flight), the timer is the safety net that unsticks the dots.
+  // Audio-in-flight (audioPending) is handled the same way — start() still
+  // wins the race, and if start never fires we fall back gracefully.
   fallbackTimer = window.setTimeout(() => {
     revealPendingTextImmediate();
-  }, 1200);
+  }, 5000);
 });
 
-xena.onChatError((message) => {
+xena.onChatError((payload) => {
   clearFallbackTimer();
   audioPending = false;
   pendingText = null;
-  showBubble(message, true);
+  // Persona line arrives pre-mapped in main; raw provider detail never does.
+  showBubble(payload.line, true);
   scheduleBubbleFade(8000);
 });
 

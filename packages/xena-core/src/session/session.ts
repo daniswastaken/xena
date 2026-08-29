@@ -3,8 +3,8 @@
  * trimmed history, streams completions with provider failover,
  * persists the transcript.
  */
-import { streamChatFailover } from "@xena/router9-client";
-import type { ChatMessage, Router9Config } from "@xena/router9-client";
+import { streamChatFailover, type ChatMessage } from "@xena/inference-gateway";
+import type { InferenceConfig } from "@xena/inference-gateway";
 import { buildSystemPrompt } from "../persona/prompt.js";
 import { MemoryStore, type StoredTranscript } from "../memory/store.js";
 import { MemoryRecall, renderRecallContext } from "../memory/recall.js";
@@ -13,8 +13,6 @@ import { FactsStore } from "../memory/facts.js";
 export interface SessionEvents {
   onToken?: (fullText: string) => void;
   onError?: (error: Error) => void;
-  /** Fires once per successful reply with the provider that served it. */
-  onProvider?: (provider: string) => void;
   /** Reasoning-model deltas before content starts (thinking indicator). */
   onReasoning?: (delta: string) => void;
 }
@@ -22,7 +20,7 @@ export interface SessionEvents {
 export interface SessionOptions {
   sessionId: string;
   storeDir: string;
-  config?: Router9Config;
+  config?: InferenceConfig;
   /** max non-system messages kept in the request context */
   historyLimit?: number;
   /** override the text model from config */
@@ -44,10 +42,10 @@ export class Session {
   private readonly facts: FactsStore | null;
   private readonly historyLimit: number;
   private readonly model: string | undefined;
-  private readonly config: Router9Config;
+  private readonly config: InferenceConfig;
   private controller: AbortController | null = null;
 
-  constructor(options: SessionOptions, config: Router9Config) {
+  constructor(options: SessionOptions, config: InferenceConfig) {
     this.id = options.sessionId;
     this.config = config;
     this.store = new MemoryStore(options.storeDir);
@@ -60,7 +58,7 @@ export class Session {
 
   static async open(
     options: SessionOptions,
-    config: Router9Config,
+    config: InferenceConfig,
   ): Promise<{ session: Session; transcript: StoredTranscript | null }> {
     const session = new Session(options, config);
     const transcript = await session.store.load(session.id);
@@ -85,7 +83,7 @@ export class Session {
     let accumulated = "";
     this.controller = new AbortController();
     try {
-      const { full, providerUsed } = await streamChatFailover(
+      const { full } = await streamChatFailover(
         payload,
         {
           model: this.model,
@@ -99,7 +97,6 @@ export class Session {
         },
         this.config,
       );
-      events.onProvider?.(providerUsed);
       await this.append({ role: "assistant", content: full });
       return full;
     } catch (error) {

@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.3.0 — 2026-08-29
+
+### Inference backend rework (ADR-004)
+- **New `packages/inference-gateway`** owns all orchestration; 9Router
+  demotes to a rung, not a prerequisite
+- **Chain (text):** Gemini `gemini-2.5-flash` (one free key: text +
+  vision + STT) → `gemini-2.5-flash-lite` → 9Router `oc/big-pickle` +
+  `oc/*` free models → keyless Pollinations `openai-fast` final net
+- **Chain (vision):** same Gemini rungs → `oc/x-preview-f-free` →
+  `oc/mimo-v2.5-free`
+- **Chain (STT):** Gemini inline audio → 9Router gpt-audio — voice
+  input now survives 9Router being down
+- **Unified launch:** Xena spawns the 9Router gateway at boot
+  (profile flags `--port 20129 --no-browser --skip-update`), probes
+  every 60s, respawns with 5s→30s backoff, adopts an already-running
+  instance, tree-kills on quit; no more manual `9router` start
+- **Self-recovery:** 404/empty evicts a model 10 min; 3 provider
+  failures = 5-min provider offline; chain collapse auto-resets the
+  supervisor; tray gains an Inference status line + "Restart
+  inference" (never restarts Xena)
+- `XENA_NINEROUTER_ENABLED=0` runs a pure Gemini + Pollinations stack
+
+### Error surface boundary (no more raw provider text)
+- Failures classify into `InferenceError` kinds (quota / timeout /
+  empty / all-down / stt / aborted / unknown)
+- Main maps kinds to persona lines before IPC — the bubble never shows
+  `9Router 404` style noise again; bar gets short plain lines; OS
+  toasts plain English with an auto-recovery note; technical detail
+  lives in console + tray diagnostics only
+- Aborts are silent; mid-stream failures leave the partial reply
+  standing (no-restart invariant extends to the error surface)
+
+### Repo
+- `router9-client` is now pure 9Router transport; apps/xena-core import
+  `@xena/inference-gateway` (import-line-only migration)
+- `scripts/check-child9router.ts` — offline child lifecycle checks
+- ADR-004 documents the chain, recovery layers, and error boundary
+
 ## 0.2.2 — 2026-08-26
 
 ### Speech bubble (replaces the chat window)

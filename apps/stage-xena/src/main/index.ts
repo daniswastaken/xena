@@ -9,8 +9,8 @@ import { BarWindow } from "./window/bar-window.js";
 import { PointerWindow } from "./window/pointer-window.js";
 import { registerIpcHandlers } from "./ipc/handlers.js";
 import { createTray } from "./tray/tray.js";
-import { loadConfig } from "@xena/router9-client";
-import { chatCompleteFailover } from "@xena/router9-client";
+import { loadInferenceConfig, refreshInPlace, supervisor, resetInference, NineRouterChild } from "@xena/inference-gateway";
+import { chatCompleteFailover } from "@xena/inference-gateway";
 import { MemoryStore, MemoryRecall, renderRecallContext, extractEmotion, buildSystemPrompt } from "@xena/xena-core";
 import { SettingsStore, defaultSettingsPath } from "./settings/store.js";
 import { ProactiveScheduler } from "./proactive/scheduler.js";
@@ -57,12 +57,14 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  const config = loadConfig();
+  const config = loadInferenceConfig();
   const settings = new SettingsStore(defaultSettingsPath(join(process.cwd(), "data")));
 
   let bar: BarWindow | null = null;
   let shake: ShakeDetector | null = null;
-let gaze: GazeTracker | null = null;
+  let gaze: GazeTracker | null = null;
+  // Xena owns the 9Router gateway now: spawn with the app, kill with it.
+  let nineRouter: NineRouterChild | null = null;
 
   app.on("second-instance", () => {
     bar?.summonCorner();
@@ -71,6 +73,13 @@ let gaze: GazeTracker | null = null;
   app.whenReady().then(() => {
     const { win: avatar } = createAvatarWindow();
     bar = new BarWindow(() => void maybeGreetBack());
+
+    // Unified launch: inference comes up with Xena. Gemini/Pollinations are
+    // plain HTTPS (instantly up); the 9Router child is spawned + supervised.
+    nineRouter = new NineRouterChild(config, {
+      onState: (state) => console.log(`[inference] 9router child: ${state}`),
+    });
+    nineRouter.start();
 
     // Welcome-back: after 30+ min away, greet on corner summon (max 1/10min).
     let lastGreetAt = 0;
@@ -189,6 +198,20 @@ let gaze: GazeTracker | null = null;
     createTray(bar, join(__dirname, "../renderer/assets"), settings, {
       live2dModels,
       onLive2dChange: pushLive2d,
+    }, {
+      statusLine: () =>
+        `${supervisor.describe()}${nineRouter && nineRouter.currentState !== "disabled" ? ` | child: ${nineRouter.currentState}` : ""}`,
+      onRestart: () => {
+        // Self-recovery: clear penalties/evictions, re-read .env in place,
+        // respawn the child. Never restarts Xena itself.
+        refreshInPlace(config);
+        resetInference();
+        nineRouter?.dispose();
+        nineRouter = new NineRouterChild(config, {
+          onState: (state) => console.log(`[inference] 9router child: ${state}`),
+        });
+        nineRouter.start();
+      },
     });
     // Restore persisted Live2D preference once the renderer is up.
     pushLive2d();
@@ -218,6 +241,7 @@ let gaze: GazeTracker | null = null;
     globalShortcut.unregisterAll();
     shake?.stop();
     gaze?.stop();
+    nineRouter?.dispose();
   });
 
   app.on("window-all-closed", () => {

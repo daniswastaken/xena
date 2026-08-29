@@ -1,6 +1,6 @@
 /**
  * Tray icon: the settings surface. Voice, idle comments, shake trigger,
- * chat summon, quit.
+ * chat summon, inference status + restart, quit.
  */
 import { app, Menu, Tray, nativeImage } from "electron";
 import { join } from "node:path";
@@ -14,11 +14,19 @@ export interface Live2dTrayHooks {
   onLive2dChange: () => void;
 }
 
+export interface InferenceTrayHooks {
+  /** One-line technical diagnostics (allowed raw detail here). */
+  statusLine: () => string;
+  /** Full self-recovery: clear penalties, re-read config, respawn child. */
+  onRestart: () => void;
+}
+
 export function createTray(
   bar: BarWindow,
   assetsDir: string,
   settings: SettingsStore,
   live2d: Live2dTrayHooks,
+  inference?: InferenceTrayHooks,
 ): Tray {
   const icon = nativeImage.createFromPath(join(assetsDir, "app-icon.png")).resize({ width: 16 });
   const tray = new Tray(icon);
@@ -27,6 +35,19 @@ export function createTray(
   const rebuild = async (): Promise<void> => {
     const { voiceEnabled, proactiveEnabled, shakeEnabled, avatarEnabled, autostartEnabled, ambientEnabled, voiceInputEnabled } =
       await settings.get();
+    const inferenceItems = inference
+      ? ([
+          { type: "separator" } as Electron.MenuItemConstructorOptions,
+          {
+            label: `Inference: ${inference.statusLine()}`,
+            enabled: false,
+          },
+          {
+            label: "Restart inference",
+            click: () => inference.onRestart(),
+          },
+        ] as Electron.MenuItemConstructorOptions[])
+      : [];
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
@@ -84,6 +105,7 @@ export function createTray(
             void settings.set({ voiceInputEnabled: !voiceInputEnabled }).then(() => void rebuild());
           },
         },
+        ...inferenceItems,
         { type: "separator" },
         { label: "Quit Xena", role: "quit" },
       ]),
@@ -96,4 +118,3 @@ export function createTray(
 
   return tray;
 }
-

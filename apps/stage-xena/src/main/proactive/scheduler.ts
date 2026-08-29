@@ -4,7 +4,7 @@
  * one comment per cooldown, never while a chat reply is streaming.
  * Comments are one-shot completions and are NOT persisted to the transcript.
  */
-import { chatCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { chatCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
 import { buildSystemPrompt, extractEmotion } from "@xena/xena-core";
 import type { SettingsStore } from "../settings/store.js";
 import { CHANNELS } from "../ipc/channels.js";
@@ -39,7 +39,7 @@ export class ProactiveScheduler {
   constructor(
     private readonly getWindow: () => Electron.BrowserWindow,
     private readonly settings: SettingsStore,
-    private readonly config: Router9Config,
+    private readonly config: InferenceConfig,
     private readonly onSpeak: (text: string, mood?: string) => Promise<void>,
     /** Optional: relevant memory fragments to flavor the idle comment. */
     private readonly memoryContext?: () => Promise<string>,

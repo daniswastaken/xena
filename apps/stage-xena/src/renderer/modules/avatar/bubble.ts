@@ -8,7 +8,6 @@ const bubble = document.getElementById("bubble") as HTMLElement;
 const nameEl = document.getElementById("bubble-name") as HTMLDivElement;
 const reasonEl = document.getElementById("bubble-reason") as HTMLDivElement;
 const textEl = document.getElementById("bubble-text") as HTMLDivElement;
-const providerEl = document.getElementById("bubble-provider") as HTMLDivElement;
 const copyBtn = document.getElementById("bubble-copy") as HTMLButtonElement;
 
 let fadeTimer: number | null = null;
@@ -63,16 +62,6 @@ export function setThinking(on: boolean): void {
   bubble.classList.add("thinking");
   presentBubble();
   copyBtn.classList.add("hidden");
-}
-
-export function setProviderNote(provider: string): void {
-  if (provider === "") {
-    providerEl.textContent = "";
-    providerEl.classList.add("hidden");
-  } else {
-    providerEl.textContent = `served by ${provider} (fallback)`;
-    providerEl.classList.remove("hidden");
-  }
 }
 
 /** Mood accent: bubble border tints with her current emotion. */

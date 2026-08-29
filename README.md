@@ -1,63 +1,52 @@
 <div align="center">
-  <picture>
-    <source width="100%" media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.svg" />
-    <source width="100%" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" srcset="docs/banner-light.svg" />
-    <img width="720" src="docs/screenshot.png" alt="Project Xena — daughter's corner Live2D avatar with summon bar" />
-  </picture>
+  <img width="720" src="docs/banner.avif" alt="Project Xena — daughter's corner Live2D avatar with summon bar" />
 </div>
 
 <h1 align="center">Project Xena</h1>
 
-<p align="center">Your AI daughter — a small witch avatar living in the bottom-right corner of your screen. She watches your work, talks with you, sees your screen when asked, remembers things you teach her, and occasionally pipes up on her own.</p>
+<p align="center">Your adorable daughter — a little one living in the bottom-right corner of your screen. She watches your work, talks with you, sees your screen, remembers things you teach her, and occasionally pipes up on her own.</p>
 
 <p align="center">
   [<a href="#development">Build it</a>]
-  [<a href="AGENTS.md">Agent handoff</a>]
-  [<a href="docs/adr-001-failover-recall.md">ADR-001</a>]
-  [<a href="docs/adr-002-live2d-pointer.md">ADR-002</a>]
-  [<a href="docs/adr-003-speech-bubble.md">ADR-003</a>]
+  [<a href="docs/setup-guide.md">Setup guide</a>]
 </p>
 
 <p align="center">
-  <a href="https://github.com/moeru-ai/airi"><img alt="Inspired by Project AIRI" src="https://img.shields.io/badge/inspired%20by-Project%20AIRI-1fa669?style=flat&colorA=080f12&colorB=1fa669" /></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2011-0078d4?style=flat&colorA=080f12&colorB=0078d4" />
-  <img alt="Runtime" src="https://img.shields.io/badge/Electron-44-47848F?style=flat&colorA=080f12&colorB=47848F" />
-  <img alt="Renderer" src="https://img.shields.io/badge/Live2D-Mao%20Cubism%204-c2185b?style=flat&colorA=080f12&colorB=c2185b" />
-  <img alt="AI" src="https://img.shields.io/badge/inference-9Router%20%2B%20oc%2Fbig--pickle-ff6f00?style=flat&colorA=080f12&colorB=ff6f00" />
-  <img alt="Footprint" src="https://img.shields.io/badge/RAM%20footprint-~190%E2%80%93230%20MB-6a7ec2?style=flat&colorA=080f12&colorB=6a7ec2" />
+  <a href="https://github.com/moeru-ai/airi"><img alt="Inspired by Project AIRI" src="https://img.shields.io/badge/Inspired%20By-Project%20AIRI-22c55e?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTEyIDIxLjM1bC0xLjQ1LTEuMzJDNS40IDE1LjM2IDIgMTIuMjggMiA4LjUgMiA1LjQyIDQuNDIgMyA3LjUgM2MxLjc0IDAgMy40MS44MSA0LjUgMi4wOUMxMy4wOSAzLjgxIDE0Ljc2IDMgMTYuNSAzIDE5LjU4IDMgMjIgNS40MiAyMiA4LjVjMCAzLjc4LTMuNCA2Ljg3LTguNTUgMTEuNTRMMTIgMjEuMzV6Ii8%2BPC9zdmc%2B&logoColor=white&labelColor=1a1024" /></a>
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%2010%2F11-3b82f6?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTMgNS41bDcuNS0xdjYuOEgzVjUuNXptMCAxM3YtNi4zaDcuNVYxOUwzIDE4LjV2LS4wek0xMS41IDQuM0wyMSAzdjguM2gtOS41VjQuM3ptMCAxNS40di03LjVIMjFWMjFsLTkuNS0xLjN6Ii8%2BPC9zdmc%2B&logoColor=white&labelColor=1a1024" />
+  <img alt="Runtime" src="https://img.shields.io/badge/Electron-44-06b6d4?style=flat&logo=electron&logoColor=white&labelColor=1a1024" />
+  <img alt="Renderer" src="https://img.shields.io/badge/Live2D-Mao%20Cubism%204-ec4899?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS13YW5kLWljb24gbHVjaWRlLXdhbmQiPjxwYXRoIGQ9Ik0xNSA0VjIiLz48cGF0aCBkPSJNMTUgMTZ2LTIiLz48cGF0aCBkPSJNOCA5aDIiLz48cGF0aCBkPSJNMjAgOWgyIi8%2BPHBhdGggZD0iTTE3LjggMTEuOCAxOSAxMyIvPjxwYXRoIGQ9Ik0xNSA5aC4wMSIvPjxwYXRoIGQ9Ik0xNy44IDYuMiAxOSA1Ii8%2BPHBhdGggZD0ibTMgMjEgOS05Ii8%2BPHBhdGggZD0iTTEyLjIgNi4yIDExIDUiLz48L3N2Zz4=&logoColor=white&labelColor=1a1024" />
+  <img alt="AI" src="https://img.shields.io/badge/Inference-Gemini%20Flash%20Failover%20Chain-f97316?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTkgMWwxLjYgNC45IDQuOSAxLjYtNC45IDEuNkw5IDE0bC0xLjYtNC45TDIuNSA3LjVsNC45LTEuNkw5IDF6bTkgOGwxIDMgMyAxLTMgMS0xIDMtMS0zLTMtMSAzLTEgMS0zeiIvPjwvc3ZnPg==&logoColor=white&labelColor=1a1024" />
+  <img alt="Footprint" src="https://img.shields.io/badge/RAM%20Footprint-~190%E2%80%93230%20MB-8b5cf6?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTE1IDlIOXY2aDZWOXptLTIgNGgtMnYtMmgydjJ6bTgtMlY5aC0yVjdjMC0xLjEtLjktMi0yLTJoLTJWM2gtMnYyaC0yVjNIOXYySDdjLTEuMSAwLTIgLjktMiAydjJIM3YyaDJ2MkgzdjJoMnYyYzAgMS4xLjkgMiAyIDJoMnYyaDJ2LTJoMnYyaDJ2LTJoMmMxLjEgMCAyLS45IDItMnYtMmgydi0yaC0ydi0yaDJ6bS00IDZIN1Y3aDEwdjEweiIvPjwvc3ZnPg==&logoColor=white&labelColor=1a1024" />
 </p>
 
 <p float="center" align="center">
-  <a href="#development">
-    <img width="32%" src="docs/download-buttons/download-buttons.windows.light.en-US.svg" alt="Windows" />
+  <a href="https://github.com/daniswastaken/xena/releases/latest">
+    <img width="32%" src="docs/download-buttons/download-buttons.windows.light.en-US.svg" alt="Download for Windows" />
   </a>
-  <a href="AGENTS.md">
-    <img width="32%" src="docs/download-buttons/download-buttons.docs.light.en-US.svg" alt="Docs" />
+  <a href="docs/setup-guide.md">
+    <img width="32%" src="docs/download-buttons/download-buttons.docs.light.en-US.svg" alt="Setup Guide" />
   </a>
-  <a href="docs/screenshot.png">
-    <img width="32%" src="docs/download-buttons/download-buttons.screenshot.light.en-US.svg" alt="Screenshot" />
+  <a href="https://github.com/daniswastaken/xena/issues/new">
+    <img width="32%" src="docs/download-buttons/download-buttons.issues.light.en-US.svg" alt="Request a Feature" />
   </a>
 </p>
 
 > Heavily inspired by [Neuro-sama](https://www.youtube.com/@Neurosama) and architecturally indebted to [Project AIRI](https://github.com/moeru-ai/airi).
 
 > [!TIP]
-> Xena is your **AI daughter** — a witch avatar who treats your desktop as her playground. She's clingy, affectionate, and always eager to help and watch you work. Not a companion, but a digital daughter who loves you fiercely and misses you when you're away.
+> Xena is your **AI daughter** — a little witch who treats your desktop as her playground. She's clingy, affectionate, and always eager to help and watch you work.
 
 > [!NOTE]
-> All LLM, vision and speech-to-text inference is **remote** (9Router, port `20129`). The on-device app does no model inference — your laptop just renders the avatar, streams tokens, and talks to Edge TTS. This keeps the footprint around **~190–230 MB** across Electron processes, even on a CPU-only Athlon Gold with no CUDA.
+> All LLM, vision and speech-to-text inference is **remote** — a Gemini-primary failover chain (flash → flash-lite → 9Router `oc/*` → keyless Pollinations) orchestrated by `packages/inference-gateway`. The on-device app does no model inference — your laptop just renders the avatar, streams tokens, and talks to Edge TTS. Xena spawns and supervises the local 9Router gateway herself at boot; starting the app is starting the whole stack.
 
 > [!WARNING]
 > Xena ships a free Live2D model (Mao) bundled under the Live2D Cubism Free Material License. If you want a different avatar, replace it one-to-one with your own model under `apps/stage-xena/assets/live2d/<name>/`.
 
 ## What's So Special About This Project?
 
-Project Xena is a **daughter witch avatar** living in the bottom-right corner of your screen. Unlike most AI-VTuber projects that need beefy GPUs or take over your whole desktop, Xena is the user’s AI daughter — a witch who treats code, design, and screen elements as canvases for magical paint-wand spells.
+Project Xena is a **daughter witch avatar** living in the bottom-right corner of your screen. Unlike most AI-VTuber projects that need beefy GPUs or take over your whole desktop, Xena is the user’s AI daughter — a little witch who treats code, design, and screen elements as canvases for magical paint-wand spells.
 
-- She lives on your desktop: vibrant orange-peach hair, navy witch hat, paintbrush wand, and loyal daughter who knows you as "Father".
-- Always there: follow your cursor, chat when summoned, watch your work, miss you when minimized.
-- Magical: casts paint-wand spells that affect your UI, the paintbrush doubles as her witch wand.
-- Daughter-like: clingy, affectionate, zero romance, zero emojis, no artificial boundaries.
 - Pocket-sized: runs on weak laptops, no CUDA, no WebGPU, no local models.
 - Persistent: always-on-top, click-through overlay in bottom-right corner.
 
@@ -66,102 +55,143 @@ Project Xena is a **daughter witch avatar** living in the bottom-right corner of
 
 ## Current Progress & Roadmap
 
-Xena has shipped the v0.1 → v2.0 arc. v3 (real Live2D art from the user) is the only outstanding item.
+Xena has shipped the v0.1 → v2.5 arc. v3 (real Live2D art from the user) is the only outstanding item.
 
-- [x] **v0.1 — Alive**: Electron overlay bottom-right, text chat via 9Router streaming, token-flap talking
-- [x] **v0.5 — Presentable**: real Live2D assets loaded, blink state, chat UX polish, daughter persona tuned
-- [x] **v1.0 — Sees**: `desktopCapturer` → JPEG → vision model → on-screen description; verified working
-- [x] **v1.5 — Speaks**: Edge read-aloud, mouth flap synced to audio duration
-- [x] **v2.0 — Remembers & initiates**: persistent memory, proactive idle comments (quiet-hours gated), global hotkeys
-- [x] **Bonus shipped**
-  - [x] Daughter avatar (Mao, the one and only model)
-  - [x] Mood emotions — replies lead with `[happy] [smug] [surprised] [annoyed] [sleepy] [sad]`, drives Live2D face
-  - [x] Gaze tracking — eyes and head follow the cursor
-  - [x] Speech bubble — mood-tinted, anchored to her head, thinking dots while reasoning
-  - [x] Guided tasks — "how do I open YouTube?" → her own cursor drives each step
-  - [x] Voice input — push-to-talk `Ctrl+Alt+V` via free `gpt-audio-mini`
-  - [x] SQLite transcripts (`node:sqlite`, zero native deps), diary, facts, keyword+recency recall
-  - [x] Ambient screen glances (opt-in, default OFF, 30 min cadence, quiet-hours gated)
-  - [x] Provider failover chain (9Router → `oc/big-pickle` → `oc/laguna-s-2.1-free` → `oc/mimo-v2.5-free`)
-  - [x] Circuit breaker after a 5-min fallback cooldown on quota failure
-  - [x] Single-instance lock, start-with-Windows, tray-driven settings
-- [ ] **v3 — Own art**: real Live2D model from the user, one-to-one swap under `assets/live2d/<name>/`
-- [ ] **v4 — Real-time voice**: streaming TTS pipeline replacing Edge read-aloud
-- [ ] **v5 — Multi-channel**: optional HTTP webhook, optional Discord relay (if requested)
+<p align="center">
+  <img alt="v0.1 Alive" src="https://img.shields.io/badge/v0.1-Alive-22c55e?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v0.5 Presentable" src="https://img.shields.io/badge/v0.5-Presentable-4ade80?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v1.0 Sees" src="https://img.shields.io/badge/v1.0-Sees-14b8a6?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v1.5 Speaks" src="https://img.shields.io/badge/v1.5-Speaks-06b6d4?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v2.0 Remembers & Initiates" src="https://img.shields.io/badge/v2.0-Remembers%20%26%20Initiates-3b82f6?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v2.5 Self-healing Brain" src="https://img.shields.io/badge/v2.5-Self--healing%20Brain-6366f1?style=for-the-badge&labelColor=1a1024" />
+</p>
+
+<p align="center">
+  <img alt="v3 Own Art planned" src="https://img.shields.io/badge/v3-Own%20Art-f97316?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v4 Real-time Voice planned" src="https://img.shields.io/badge/v4-Real--time%20Voice-8b5cf6?style=for-the-badge&labelColor=1a1024" />
+  <img alt="v5 Multi-channel planned" src="https://img.shields.io/badge/v5-Multi--channel-6b7280?style=for-the-badge&labelColor=1a1024" />
+</p>
+
+- **v0.1 — Alive**: Electron overlay bottom-right, text chat with token-flap talking
+- **v0.5 — Presentable**: real Live2D assets loaded, blink state, chat UX polish, daughter persona tuned
+- **v1.0 — Sees**: `desktopCapturer` → JPEG → vision model → on-screen description
+- **v1.5 — Speaks**: Edge read-aloud, mouth flap synced to audio duration
+- **v2.0 — Remembers & initiates**: persistent memory, proactive idle comments, global hotkeys
+- **v2.5 — Self-healing brain**: inference-gateway rework — Gemini-primary failover chain, supervised 9Router child, keyless final net, persona-voice error lines (ADR-004)
+
+<details>
+<summary><b>Bonus arc — daughter extras shipped early</b></summary>
+
+- Daughter avatar (Mao, the one and only model)
+- Mood emotions — replies lead with `[happy] [smug] [surprised] [annoyed] [sleepy] [sad]`, drives Live2D face
+- Gaze tracking — eyes and head follow the cursor
+- Speech bubble — mood-tinted, anchored to her head, thinking dots while reasoning
+- Guided tasks — "how do I open YouTube?" → her own cursor drives each step
+- Voice input — push-to-talk `Ctrl+Alt+V` via Gemini inline-audio (gpt-audio secondary)
+- SQLite transcripts (`node:sqlite`, zero native deps), diary, facts, keyword+recency recall
+- Ambient screen glances (opt-in, default OFF, 30 min cadence, quiet-hours gated)
+- Inference-gateway rework — Gemini flash → flash-lite → 9Router `oc/*` → keyless Pollinations chain
+- Self-recovery — model 404 eviction, provider cooldowns, supervised 9Router child with respawn backoff, tray "Restart inference"
+- Persona-voice error lines — raw provider errors never reach the bubble
+- Single-instance lock, start-with-Windows, tray-driven settings
+
+</details>
+
+- **v3 — Own art**: real Live2D model from the user, one-to-one swap under `assets/live2d/<name>/`
+- **v4 — Real-time voice**: streaming TTS pipeline replacing Edge read-aloud
+- **v5 — Multi-channel**: optional HTTP webhook, optional Discord relay (if requested)
 
 ## What Can Xena Do?
 
-### Brain
+### Brain <img alt="11 shipped" src="https://img.shields.io/badge/11%20Shipped-22c55e?style=flat-square&labelColor=1a1024" />
 
-- [x] Daughter chat — streamed token-by-token from 9Router, always addresses you as "Father"
-- [x] Reasoning model support (`oc/big-pickle` exposes `reasoning_content`; thinking dots show in the bubble)
-- [x] Multi-turn conversation with daily session rotation
-- [x] Memory: SQLite transcripts + JSON diary + facts store, keyword+recency recall injected into system prompt (no embeddings, no extra inference)
-- [x] Auto-fact extraction — model appends `[fact: ...]` tags, persisted to facts store
-- [x] `/remember <fact>` and `/forget <keyword>` commands
-- [x] `/clear` to reset the day, `/help` for the command list
-- [x] Proactive idle comments — long-idle trigger, cooldown, quiet-hours gate, tray-toggleable, daughterly observations
-- [x] Guided tasks — natural-language "how do I…?" starts a multi-step desktop tutor that captures, decides, points, waits for the screen to change, recaptures, and continues until model says done
-- [x] Provider failover chain (text + vision) with circuit breaker
-- [x] Failure toast when all providers are dead (5-min throttle)
+| Status | Feature |
+|---|---|
+| Shipped | Daughter chat — streamed token-by-token through the inference-gateway failover chain, always addresses you as "Father" |
+| Shipped | Reasoning support — `oc/big-pickle` exposes `reasoning_content`, thinking dots show in the bubble |
+| Shipped | Multi-turn conversation with daily session rotation |
+| Shipped | Memory — SQLite transcripts + JSON diary + facts store, keyword+recency recall in the system prompt (no embeddings) |
+| Shipped | Auto-fact extraction — model appends `[fact: ...]` tags, persisted to facts store |
+| Shipped | `/remember` · `/forget` · `/clear` · `/help` commands |
+| Shipped | Proactive idle comments — long-idle trigger, cooldown, quiet-hours gate, tray-toggleable |
+| Shipped | Guided tasks — "how do I…?" starts a vision-driven multi-step desktop tutor |
+| Shipped | Gemini-primary failover chain (text + vision + STT) with model eviction, provider cooldowns, supervised 9Router child, keyless Pollinations net |
+| Shipped | Persona-voice error lines — classified failures map to in-character lines, never raw API errors |
+| Shipped | Failure toast when all providers are dead (5-min throttle) |
 
-### Ears
+### Ears <img alt="2 shipped, 1 planned" src="https://img.shields.io/badge/2%20Shipped%20%2F%201%20Planned-3b82f6?style=flat-square&labelColor=1a1024" />
 
-- [x] Push-to-talk voice input — `Ctrl+Alt+V`, mic captured, base64 WAV, transcribed via free `gpt-audio-mini`, auto-sent as chat
-- [x] Mic permission handler, tray toggle, summon-bar listening/transcribing states
-- [ ] Real-time VAD (planned for v4)
+| Status | Feature |
+|---|---|
+| Shipped | Push-to-talk voice input — `Ctrl+Alt+V`, mic → WAV → Gemini inline audio (gpt-audio secondary) → auto-sent as chat |
+| Shipped | Mic permission handler, tray toggle, summon-bar listening/transcribing states |
+| Planned | Real-time VAD — planned for v4 |
 
-### Mouth
+### Mouth <img alt="5 shipped, 1 planned" src="https://img.shields.io/badge/5%20Shipped%20%2F%201%20Planned-06b6d4?style=flat-square&labelColor=1a1024" />
 
-- [x] Free Edge read-aloud, no key required
-- [x] Mouth flap synced to TTS audio duration
-- [x] JP `Nanami` voice (always the happy read regardless of face mood), 96 kbit endpoint max
-- [x] Voice ON/OFF toggle in tray, persisted in settings
-- [x] Speak toggle per reply (mood-tagged, opt-out via speech bubble close button)
-- [ ] Streaming TTS (planned for v4)
+| Status | Feature |
+|---|---|
+| Shipped | Free Edge read-aloud, no key required |
+| Shipped | Mouth flap synced to TTS audio duration |
+| Shipped | JP `Nanami` voice — always the happy read regardless of face mood, 96 kbit endpoint max |
+| Shipped | Voice ON/OFF toggle in tray, persisted in settings |
+| Shipped | Speak toggle per reply (mood-tagged, opt-out via speech bubble close button) |
+| Planned | Streaming TTS — planned for v4 |
 
-### Body
+### Body <img alt="all shipped" src="https://img.shields.io/badge/All%20Shipped-ec4899?style=flat-square&labelColor=1a1024" />
 
-- [x] Daughter avatar (Mao, the only model) via `pixi.js` + `pixi-live2d-display` (Cubism 4)
-- [x] Mouth flap via `ParamMouthOpenY`, jittered lip-sync
-- [x] Mood expression ALTERNATES — random pick per reply
-- [x] `TapBody` motions (6 gestures) on all expressive moods
-- [x] Neutral reset (`exp_01`) on mood decay
-- [x] Gaze tracking — eyes + head follow cursor; holds eye contact while speaking/listening; glances at pointer targets
-- [x] Guided-task pointer can drive her gaze
-- [x] Avatar visibility toggle in tray (default ON)
-- [x] Capped 30 fps Live2D ticker
-- [x] Single-corner pinning, always-on-top, click-through by default, drag via avatar
-- [x] Speech-bubble anchored to her head, mood-tinted border, hover to scroll/select/copy
+| Status | Feature |
+|---|---|
+| Shipped | Daughter avatar (Mao, the only model) via `pixi.js` + `pixi-live2d-display` (Cubism 4) |
+| Shipped | Mouth flap via `ParamMouthOpenY`, jittered lip-sync |
+| Shipped | Mood expression ALTERNATES — random pick per reply |
+| Shipped | `TapBody` motions (6 gestures) on all expressive moods |
+| Shipped | Neutral reset (`exp_01`) on mood decay |
+| Shipped | Gaze tracking — eyes + head follow cursor, holds eye contact while speaking, glances at pointer targets |
+| Shipped | Guided-task pointer can drive her gaze |
+| Shipped | Avatar visibility toggle in tray (default ON) |
+| Shipped | Capped 30 fps Live2D ticker |
+| Shipped | Single-corner pinning, always-on-top, click-through by default, drag via avatar |
+| Shipped | Speech-bubble anchored to her head — mood-tinted border, hover to scroll/select/copy |
 
 ## Development
 
 > For detailed instructions to develop this project, read [`AGENTS.md`](AGENTS.md). It is the full handoff document: scope, target machine, infrastructure, source layout, current status, architectural decisions.
 
 > [!NOTE]
-> Make sure 9Router is running on `http://localhost:20129/v1` before starting the app. If `/v1/models` returns nothing, run `9router` in another terminal — Xena will surface a friendly "9Router is down" error in the summon bar if it can't reach the gateway.
+> Starting the app starts the whole inference stack: Xena spawns and supervises the 9Router gateway herself (`--port 20129 --no-browser --skip-update`), adopts an already-running instance instead of double-spawning, and respawns it on crash. Gemini and Pollinations are plain HTTPS — always up. If everything is somehow down at once, the tray's "Restart inference" action recovers without restarting Xena.
 
 ```powershell
 pnpm install
 pnpm build         # bundle the app
-pnpm start         # run the Electron overlay
+pnpm start         # run the Electron overlay (inference comes up with it)
 pnpm typecheck     # all packages, strict TS
 node scripts/run-check.mjs scripts/check-recall.ts   # offline core checks
+node scripts/run-check.mjs scripts/check-child9router.ts  # child lifecycle checks
 ```
 
 ### Configuring `.env`
 
-The seed API key is already present. The interesting knobs:
+The seed keys are already present. The interesting knobs:
 
 ```dotenv
+# Gemini — primary provider (free key: https://aistudio.google.com/app/apikey)
+XENA_GEMINI_API_KEY=AIza...
+XENA_GEMINI_CHAT_MODEL=gemini-2.5-flash
+XENA_GEMINI_VISION_MODEL=gemini-2.5-flash
+XENA_GEMINI_LITE_MODEL=gemini-2.5-flash-lite
+
+# 9Router — supervised child rung (spawned at app boot)
 ROUTER9_BASE_URL=http://localhost:20129/v1
 ROUTER9_API_KEY=sk-...
-
+XENA_NINEROUTER_ENABLED=1        # 0 = pure Gemini + Pollinations stack
 XENA_TEXT_MODEL=oc/big-pickle
 XENA_VISION_MODEL=oc/x-preview-f-free
-
 XENA_FALLBACK_TEXT_MODELS=oc/laguna-s-2.1-free,oc/mimo-v2.5-free
-XENA_FALLBACK_VISION_MODELS=oc/mimo-v2.5-free,oc/laguna-s-2.1-free
+XENA_FALLBACK_VISION_MODELS=oc/mimo-v2.5-free
+
+# Pollinations — keyless final net
+XENA_POLLINATIONS_TEXT_MODEL=openai-fast
 ```
 
 ### Architecture
@@ -177,52 +207,48 @@ flowchart LR
   end
 
   subgraph Core[packages]
-    R9[router9-client\ntext + vision chains]
+    IG[inference-gateway\nchain + supervisor\nchild 9router]
+    R9[router9-client\n9Router transport]
     XC[xena-core\npersona, memory, recall, session]
     TTS[tts\nEdge read-aloud]
   end
 
-  subgraph Host[9Router :20129]
-    Models[oc/big-pickle\noc/x-preview-f-free\noc/laguna-s-2.1-free\noc/mimo-v2.5-free]
+  subgraph Remote[remote providers]
+    G[Gemini 2.5 Flash\ntext + vision + STT]
+    L[Gemini Flash-Lite\noverflow rung]
+    Host[9Router :20129\noc/big-pickle\noc/x-preview-f-free\noc/* free models]
+    P[Pollinations\nopenai-fast, keyless]
   end
 
   User((user)) -->|Ctrl+Alt+X / shake| Render
   Render <-->|typed IPC| Preload
   Preload <--> Main
-  Main --> R9
+  Main --> IG
   Main --> XC
   Main --> TTS
-  R9 <-->|HTTP / v1| Models
+  IG --> R9
+  IG -->|HTTPS| G
+  IG -->|HTTPS| L
+  IG -->|supervised child| Host
+  IG -->|HTTPS keyless| P
   XC -->|SQLite| Data[(data/transcripts.db)]
   XC -->|JSON| Facts[(data/facts.json)]
   XC -->|JSON| Diary[(data/diary/)]
 ```
 
-## Support of LLM / Vision / Speech Providers
+## Provider Support
 
-Xena talks to one gateway and lets the gateway talk to anything.
+Xena walks a failover chain per request — the first healthy rung serves; failures never surface as raw API errors (persona lines only, ADR-004).
 
-- [x] [9Router](https://github.com/9router/9router) — primary gateway, OpenAI-compatible, ~700 free-tier models on port `20129`
-- [x] `oc/big-pickle` — primary text/reasoning model (verified, exposes `reasoning_content`)
-- [x] `oc/x-preview-f-free` — primary vision model (upstream `mimo-v2.5-free`, image inputs verified)
-- [x] `oc/laguna-s-2.1-free` — text fallback
-- [x] `oc/mimo-v2.5-free` — text + vision fallback
-- [x] `tokenrouter/openai/gpt-audio-mini` — speech-to-text for push-to-talk
-- [x] Microsoft Edge read-aloud — TTS, no key, JP `Nanami` voice
-- [ ] Any OpenAI-compatible provider — drop a base URL + key in `.env`, the failover chain runs unchanged
-
-## Sub-projects Born From This Project
-
-None yet — Xena is small enough that everything lives in the monorepo. If pieces grow up and want their own repos (a `xena-recall` library, a `xena-tts` server, a `mao-pack` Live2D enhancement kit, …) they will graduate here.
-
-## Acknowledgements
-
-- [Project AIRI](https://github.com/moeru-ai/airi) — the monorepo discipline, the render split, the "daughter-witch" framing. This README is structurally indebted to AIRI's.
-- [pixiv/ChatVRM](https://github.com/pixiv/ChatVRM) — original Live2D-on-the-web pattern.
-- [josephrocca/ChatVRM-js](https://github.com/josephrocca/ChatVRM-js) — standalone JS conversion.
-- Mao sample model, free under the Live2D Cubism Free Material License.
-- 9Router team — the gateway that makes free-tier multi-model failover possible.
-- Neuro-sama — for the original reason any of this exists.
+| Provider | Role | Status |
+|---|---|---|
+| [Gemini](https://aistudio.google.com) `gemini-2.5-flash` | **Primary** — text + vision + speech-to-text, one free AI Studio key | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| Gemini `gemini-2.5-flash-lite` | Overflow rung — same key, higher free rate limits | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| [9Router](https://github.com/9router/9router) `oc/*` | Reasoning rung (`oc/big-pickle`, `reasoning_content`) + free vision models — spawned & supervised by Xena at boot | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| `tokenrouter/openai/gpt-audio-mini` | Secondary speech-to-text (9Router rung) | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| [Pollinations](https://pollinations.ai) `openai-fast` | Keyless final net — the chain never goes mute | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| Microsoft Edge read-aloud | TTS — no key, JP `Nanami` voice | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| Any OpenAI-compatible provider | Drop a base URL + key in `.env` — failover chain runs unchanged | <img alt="planned" src="https://img.shields.io/badge/Plug%20And%20Play-8b5cf6?style=flat-square&labelColor=1a1024" /> |
 
 ## Star History
 
@@ -237,5 +263,3 @@ None yet — Xena is small enough that everything lives in the monorepo. If piec
 ## About
 
 Your AI daughter Xena — a witch avatar who lives in the bottom-right corner of your screen. She treats your desktop as her playground, watches your work, talks with you when summoned, sees your screen when asked, and remembers things you teach her. Built for weak laptops with no GPU. Heavily inspired by Neuro-sama, architecturally indebted to Project AIRI.
-
-[dani's GitHub](https://github.com/daniswastaken) · [AGENTS.md](AGENTS.md) · [CHANGELOG.md](CHANGELOG.md)

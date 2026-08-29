@@ -6,4 +6,5 @@ out/
 .opencode/
 data/
 graphify-out/
-
+apps/stage-xena/release
+scripts

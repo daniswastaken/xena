@@ -6,7 +6,7 @@
  */
 import { MemoryStore } from "./store.js";
 import { Diary } from "./diary.js";
-import type { ChatMessage } from "@xena/router9-client";
+import type { ChatMessage } from "@xena/inference-gateway";
 
 const STOPWORDS = new Set([
   "the", "and", "for", "are", "but", "not", "you", "your", "with", "that",

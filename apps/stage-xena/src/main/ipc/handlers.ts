@@ -10,7 +10,8 @@ import { MemoryStore } from "@xena/xena-core";
 import { Diary } from "@xena/xena-core";
 import { FactsStore } from "@xena/xena-core";
 import { extractEmotion, extractFactTags, buildSystemPrompt } from "@xena/xena-core";
-import { askAboutImage, chatCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { askAboutImage, chatCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
+import { bubbleLine, errorKind, guidedTaskLine, notifyLine, rawDetail, barLine } from "../ui/error-lines.js";
 import { CHANNELS } from "./channels.js";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { GuidedTask, looksLikeGuidedTask } from "../pointer/guided-task.js";
@@ -42,7 +43,7 @@ function todaySessionId(): string {
 }
 
 export function registerIpcHandlers(
-  config: Router9Config,
+  config: InferenceConfig,
   settings: SettingsStore,
   scheduler: ProactiveScheduler,
   bar: BarWindow,
@@ -136,19 +137,33 @@ export function registerIpcHandlers(
 
   let lastFailToastAt = 0;
 
-  function notifyBrainDown(message: string): void {
-    // Only when every provider failed; throttle to one toast per 5 minutes.
+  function notifyBrainDown(error: unknown): void {
+    // Only when every rung failed; throttle to one toast per 5 minutes.
+    const body = notifyLine(error);
+    if (body === "") return;
     if (Date.now() - lastFailToastAt < 5 * 60_000) return;
     lastFailToastAt = Date.now();
+    console.error(`[inference] chain failure — ${rawDetail(error)}`);
     try {
       new Notification({
         title: "Xena can't reach her brain",
-        body: message.slice(0, 160),
+        body,
         silent: true,
       }).show();
     } catch {
       // notifications are best-effort
     }
+  }
+
+  /** Persona-voice error to the bubble; never raw provider detail. */
+  function presentReplyError(error: unknown): void {
+    const kind = errorKind(error);
+    if (kind === "aborted") return; // user's own stop — silence
+    const surface = bubbleLine(error);
+    if (!surface) return;
+    avatarWin().webContents.send(CHANNELS.chatError, { line: surface.line, kind });
+    avatarWin().webContents.send(CHANNELS.avatarEmote, surface.mood);
+    notifyBrainDown(error);
   }
 
   ipcMain.handle(CHANNELS.chatSend, async (_event, text: unknown) => {
@@ -194,7 +209,10 @@ export function registerIpcHandlers(
       avatarWin().webContents.send(CHANNELS.chatThinking, true);
       void task.run(trimmed).catch((error: unknown) => {
         avatarWin().webContents.send(CHANNELS.chatThinking, false);
-        avatarWin().webContents.send(CHANNELS.chatError, error instanceof Error ? error.message : String(error));
+        const surface = guidedTaskLine();
+        avatarWin().webContents.send(CHANNELS.chatError, { line: surface.line, kind: errorKind(error) });
+        avatarWin().webContents.send(CHANNELS.avatarEmote, surface.mood);
+        console.error(`[inference] guided task failed — ${rawDetail(error)}`);
         avatarWin().webContents.send(CHANNELS.chatDone, true);
       }).finally(() => {
         if (guidedTask === task) guidedTask = null;
@@ -225,6 +243,9 @@ export function registerIpcHandlers(
     }
     try {
       const session = await getSession();
+      // Stream error surfaces only when nothing reached the bubble;
+      // a partial reply stands as-is (ADR-001 no-restart invariant).
+      let streamError: unknown = null;
       const reply = await session.send(text.trim(), {
         onToken: (full) => {
                       if (thinkingShown) {
@@ -234,8 +255,8 @@ export function registerIpcHandlers(
           avatarWin().webContents.send(CHANNELS.chatToken, full);
         },
         onError: (error) => {
-          avatarWin().webContents.send(CHANNELS.chatError, error.message);
-          notifyBrainDown(error.message);
+          streamError = error;
+          console.error(`[inference] reply failed — ${rawDetail(error)}`);
         },
         onReasoning: () => {
           if (!thinkingShown) {
@@ -243,11 +264,11 @@ export function registerIpcHandlers(
             avatarWin().webContents.send(CHANNELS.chatThinking, true);
           }
         },
-        onProvider: (provider) => {
-          // Always send: empty clears a stale fallback badge on recovery.
-          avatarWin().webContents.send(CHANNELS.chatProvider, provider === "router9" ? "" : provider);
-        },
       });
+      if (streamError !== null && reply.trim() === "") {
+        presentReplyError(streamError);
+        return;
+      }
       avatarWin().webContents.send(CHANNELS.chatDone, true);
       // Reading time scales with the answer: 8s base + 20ms/char (max +20s).
       const { clean, emotion } = extractEmotion(reply);
@@ -319,9 +340,12 @@ export function registerIpcHandlers(
   ipcMain.handle(CHANNELS.voiceTranscribe, async (_event, audio: unknown) => {
     if (typeof audio !== "string" || audio.length < 100) throw new Error("no audio");
     scheduler.noteActivity();
-    const text = await transcribeAudio(audio, config);
-    if (text === "") throw new Error("empty transcription");
-    return text;
+    try {
+      return await transcribeAudio(audio, config);
+    } catch (error) {
+      console.error(`[inference] transcription failed — ${rawDetail(error)}`);
+      throw new Error(barLine(error));
+    }
   });
 
   ipcMain.handle(CHANNELS.getStats, async () => {
@@ -352,9 +376,10 @@ export function registerIpcHandlers(
     let answer: string;
     try {
       answer = await askAboutImage(q, dataUrl, config, buildSystemPrompt());
-    } catch (err) {
+    } catch (error) {
       if (free) avatarWin().webContents.send(CHANNELS.chatThinking, false);
-      throw err;
+      console.error(`[inference] /look failed — ${rawDetail(error)}`);
+      throw new Error(barLine(error));
     }
     const { clean, emotion } = extractEmotion(answer.trim());
     const { clean: speakable, facts } = extractFactTags(clean);

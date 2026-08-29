@@ -111,18 +111,20 @@ function parseSseFrames(text: string): RawResponse | null {
 
 export async function chatComplete(
   messages: ChatMessage[],
-  options: Omit<ChatRequestOptions, "messages" | "signal"> & { signal?: AbortSignal },
+  options: Omit<ChatRequestOptions, "messages" | "signal"> & { signal?: AbortSignal; baseUrl?: string; apiKey?: string },
   config: Router9Config = loadConfig(),
 ): Promise<ChatCompletionResult> {
+  const baseUrl = options.baseUrl ?? config.baseUrl;
+  const apiKey = options.apiKey ?? config.apiKey;
   const body = JSON.stringify({
     model: options.model,
     messages,
     max_tokens: options.maxTokens ?? 512,
     ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
   });
-  const res = await fetch(`${config.baseUrl}/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body,
     signal: options.signal,
   });

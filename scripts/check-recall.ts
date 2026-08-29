@@ -11,14 +11,7 @@ import { MemoryRecall, renderRecallContext } from "@xena/xena-core";
 import { Diary } from "@xena/xena-core";
 import { FactsStore } from "@xena/xena-core";
 import { extractEmotion, extractFactTags, cleanForDisplay, isEmotion, EMOTIONS, XENA_SYSTEM_PROMPT, buildSystemPrompt } from "@xena/xena-core";
-import { loadConfig } from "@xena/router9-client";
-import {
-  buildProviderChain,
-  buildVisionChain,
-  chatCompleteFailover,
-  visionCompleteFailover,
-  Router9Error,
-} from "@xena/router9-client";
+import { loadInferenceConfig, describeChain, supervisor, resetInference, chatCompleteFailover, visionCompleteFailover, InferenceError, type InferenceConfig } from "@xena/inference-gateway";
 
 let failures = 0;
 function assert(cond: boolean, label: string): void {
@@ -132,70 +125,61 @@ async function main(): Promise<void> {
     assert(block.startsWith("[fragments"), "rendered context block formatted");
 
     // --- Failover chain ------------------------------------------------------
-    const base = loadConfig();
-    console.log(`      chain: ${buildProviderChain(base).map((p) => `${p.name}:${p.model}`).join(" -> ")}`);
-    const chain = buildProviderChain(base);
-    assert(chain.length >= 2, "fallback free models present -> multi-provider chain");
-    assert(chain[0]!.name === "router9" && chain[0]!.model === "oc/big-pickle", "primary is router9:oc/big-pickle");
-    const fbModels = chain.slice(1).map((p) => p.model);
-    assert(fbModels.every((m) => m.startsWith("oc/")), "all failover targets are 9Router free-tier oc/* models");
-    assert(fbModels.includes("oc/laguna-s-2.1-free"), "laguna-s-2.1-free is a free fallback");
+    const base = loadInferenceConfig();
+    const chain = describeChain(base, "text");
+    console.log(`      chain: ${chain.join(" -> ")}`);
+    assert(chain.length >= 3, "multi-rung chain present (gemini x2 + router9 + pollinations)");
+    assert(chain[0] === `gemini/${base.geminiChatModel}`, "primary rung is gemini primary model");
+    assert(chain[1] === `gemini-lite/${base.geminiLiteModel}`, "second rung is gemini flash-lite");
+    assert(chain.includes(`router9/${base.textModel}`), "router9 reasoning rung present");
+    assert(chain[chain.length - 1] === `pollinations/${base.pollinationsTextModel}`, "last rung is keyless pollinations");
+    const vision = describeChain(base, "vision");
+    assert(vision[0] === `gemini/${base.geminiVisionModel}`, "vision chain leads with gemini");
 
-    // --- Live: normal path (only if 9Router is up) ---------------------------
-    let router9Up = false;
-    try {
-      const res = await fetch(`${base.baseUrl}/models`, {
-        headers: { Authorization: `Bearer ${base.apiKey}` },
-        signal: AbortSignal.timeout(4000),
-      });
-      router9Up = res.ok;
-    } catch {
-      router9Up = false;
-    }
-    if (router9Up) {
-      try {
-        const result = await chatCompleteFailover(
-          [{ role: "user", content: "Reply with exactly: OK" }],
-          { maxTokens: 200 },
-          base,
-        );
-        // Either provider is a pass — failover on primary quota exhaustion is by design.
-        assert(true, `live completion served by ${result.providerUsed}`);
-        console.log(`      reply: ${JSON.stringify(result.content.slice(0, 40))}`);
-      } catch (error) {
-        const status = error instanceof Router9Error ? error.status : null;
-        if (status === 429 || status === 402 || status === 502 || status === 503) {
-          // All providers rate/quota-limited — expected free-tier pressure.
-          assert(true, `live completion blocked by quota everywhere (status ${status}) — failover exercised`);
-        } else {
-          console.log(`      live error: ${error instanceof Error ? error.message : String(error)}`);
-          assert(false, "live completion succeeded on some provider");
-        }
-      }
-    } else {
-      console.log("SKIP  live check — 9Router unreachable");
-    }
+    // --- Supervisor: 404 evicts model, chain rebuilds without it ------------
+    supervisor.evictModel("router9", base.textModel, "test eviction");
+    assert(!describeChain(base, "text").includes(`router9/${base.textModel}`), "evicted model excluded from rebuilt chain");
+    resetInference();
+    assert(describeChain(base, "text").includes(`router9/${base.textModel}`), "resetInference restores evicted model");
 
-    // --- Live: forced failover (primary dead -> free 9Router fallback) -------
-    const brokenPrimary = { ...base, baseUrl: "http://127.0.0.1:9/v1" }; // nothing listens here
+    // --- Live: normal path (Gemini is always-on HTTPS; no local router needed)
     try {
       const result = await chatCompleteFailover(
         [{ role: "user", content: "Reply with exactly: OK" }],
         { maxTokens: 200 },
-        brokenPrimary,
+        base,
       );
-      assert(result.providerUsed === "router9-fb", `forced failover served by ${result.providerUsed}`);
+      assert(true, `live completion served by ${result.providerUsed}`);
       console.log(`      reply: ${JSON.stringify(result.content.slice(0, 40))}`);
     } catch (error) {
-      const reachedFallback = error instanceof Router9Error || error instanceof Error;
+      const kind = error instanceof InferenceError ? error.kind : null;
+      if (kind === "quota" || kind === "all-down") {
+        assert(true, `live completion blocked everywhere (kind: ${kind}) — failover exercised`);
+      } else {
+        console.log(`      live error: ${error instanceof Error ? error.message : String(error)}`);
+        assert(false, "live completion succeeded on some rung");
+      }
+    }
+
+    // --- Live: forced failover (router9 base dead -> gemini/pollinations serve)
+    const brokenR9: InferenceConfig = { ...base, baseUrl: "http://127.0.0.1:9/v1" }; // nothing listens here
+    try {
+      const result = await chatCompleteFailover(
+        [{ role: "user", content: "Reply with exactly: OK" }],
+        { maxTokens: 200 },
+        brokenR9,
+      );
+      assert(result.providerUsed.startsWith("gemini"), `forced failover served by ${result.providerUsed}`);
+      console.log(`      reply: ${JSON.stringify(result.content.slice(0, 40))}`);
+    } catch (error) {
       console.log(`      failover error: ${error instanceof Error ? error.message : String(error)}`);
-      assert(reachedFallback, "forced failover reached fallback provider");
+      assert(false, "forced failover reached a healthy rung");
     }
 
     // --- Live: vision failover (opt-in via XENA_CHECK_VISION=1; free tier) ----
     if (process.env.XENA_CHECK_VISION === "1") {
-      const visionChain = buildVisionChain(base);
-      console.log(`      vision chain: ${visionChain.map((p) => `${p.name}:${p.model}`).join(" -> ")}`);
+      const visionChain = describeChain(base, "vision");
+      console.log(`      vision chain: ${visionChain.join(" -> ")}`);
       // 1x1 red PNG, minimal bytes.
       const tinyPng =
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";
@@ -215,12 +199,12 @@ async function main(): Promise<void> {
         );
         assert(result.content.trim() !== "", `vision served by ${result.providerUsed}: ${result.content.trim().slice(0, 60)}`);
       } catch (error) {
-        const status = error instanceof Router9Error ? error.status : null;
-        if (status === 429 || status === 402 || status === 502 || status === 503) {
-          assert(true, `vision blocked by quota everywhere (status ${status}) — chain exercised`);
+        const kind = error instanceof InferenceError ? error.kind : null;
+        if (kind === "quota" || kind === "all-down" || kind === "empty") {
+          assert(true, `vision blocked everywhere (kind: ${kind}) — chain exercised`);
         } else {
           console.log(`      vision error: ${error instanceof Error ? error.message : String(error)}`);
-          assert(false, "vision completion succeeded on some provider");
+          assert(false, "vision completion succeeded on some rung");
         }
       }
     } else {

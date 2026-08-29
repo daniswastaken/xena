@@ -1,7 +1,7 @@
 /** Interactive screen guidance: plan one visible action, wait for its result, repeat. */
 import { nativeImage, screen } from "electron";
 import { buildSystemPrompt } from "@xena/xena-core";
-import { visionCompleteFailover, type Router9Config } from "@xena/router9-client";
+import { visionCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
 import type { PointerWindow } from "../window/pointer-window.js";
@@ -37,7 +37,7 @@ export class GuidedTask {
   private cancelled = false;
 
   constructor(
-    private readonly config: Router9Config,
+    private readonly config: InferenceConfig,
     private readonly pointer: PointerWindow,
     private readonly hooks: GuidedTaskHooks,
   ) {}

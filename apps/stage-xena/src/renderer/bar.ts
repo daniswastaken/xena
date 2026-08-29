@@ -110,11 +110,10 @@ function dismissForReply(): void {
 }
 
 function friendlyError(message: string): string {
-  if (/fetch failed|ECONNREFUSED|network/i.test(message)) {
-    return "Can't reach 9Router (localhost:20129). Start it with the `9router` command, then retry.";
-  }
-  if (/transcription|no audio|HTTP 4\d\d/i.test(message)) {
-    return "Couldn't work out what was said — try again or type it instead.";
+  // Main maps known failure kinds to plain lines; this is the last-resort
+  // net so a stray raw message still reads as Xena, not as a stack trace.
+  if (/fetch failed|ECONNREFUSED|network|HTTP \d{3}|Router9|router9|gemini|pollinations/i.test(message)) {
+    return "That didn't work — try again in a moment.";
   }
   return message;
 }
@@ -279,10 +278,11 @@ xena.onChatDone(() => {
   }
 });
 
-xena.onChatError((message) => {
+xena.onChatError((payload) => {
   setBusy(false);
   dot.classList.remove("thinking");
-  setStatus(friendlyError(message), true);
+  // Persona/short line arrives pre-mapped in main — no raw provider text.
+  setStatus(payload.line, true);
   scheduleFade(FADE_AFTER_ANSWER_MS);
 });
 

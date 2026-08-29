@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@xena/router9-client": "workspace:*"
+    "@xena/inference-gateway": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
