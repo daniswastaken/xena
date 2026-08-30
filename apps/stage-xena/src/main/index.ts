@@ -4,13 +4,13 @@
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 import { app, globalShortcut } from "electron";
 import { join } from "node:path";
-import { dataDir } from "./paths.js";
+import { dataDir, envDir } from "./paths.js";
 import { createAvatarWindow } from "./window/overlay.js";
 import { BarWindow } from "./window/bar-window.js";
 import { PointerWindow } from "./window/pointer-window.js";
 import { registerIpcHandlers } from "./ipc/handlers.js";
 import { createTray } from "./tray/tray.js";
-import { loadInferenceConfig, refreshInPlace, supervisor, resetInference, NineRouterChild } from "@xena/inference-gateway";
+import { loadInferenceConfig, refreshInPlace, supervisor, resetInference, NineRouterChild, applyRuntimeOverrides, setEnvDir } from "@xena/inference-gateway";
 import { chatCompleteFailover } from "@xena/inference-gateway";
 import { MemoryStore, MemoryRecall, renderRecallContext, extractEmotion, buildSystemPrompt } from "@xena/xena-core";
 import { SettingsStore, defaultSettingsPath } from "./settings/store.js";
@@ -45,8 +45,16 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
+  // Packaged boot: .env lives next to the installed exe — point the reader
+  // there before the first load (dev keeps walking up to the repo root).
+  setEnvDir(envDir());
   const config = loadInferenceConfig();
   const settings = new SettingsStore(defaultSettingsPath(dataDir()));
+  // Persisted Gemini key (from first-run setup) overlays file/env values;
+  // process env still wins (dev machines, power users).
+  void settings.get().then((persisted) => {
+    applyRuntimeOverrides(config, { geminiApiKey: persisted.geminiApiKey });
+  });
 
   let bar: BarWindow | null = null;
   let shake: ShakeDetector | null = null;

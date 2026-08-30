@@ -39,13 +39,25 @@ function parseBool(value: string | undefined): boolean | null {
 
 let cached: InferenceConfig | null = null;
 
+/** Set by the app layer once at boot: dir containing .env for the packaged app. */
+let runtimeEnvDir: string | undefined;
+
+/** Point .env resolution at the installed app dir (next to Xena.exe). */
+export function setEnvDir(dir: string | undefined): void {
+  runtimeEnvDir = dir;
+}
+
 /**
  * Wraps router9-client's loadConfig (which owns the shared .env fields) and
  * layers the gateway fields on top. Cache can be dropped via resetInference.
+ *
+ * Priority for each field: process env > .env file > default. Packaged apps
+ * have no repo .env — the app layer must call applyRuntimeOverrides() with
+ * persisted settings (Gemini key from setup) after boot.
  */
 export function loadInferenceConfig(env: NodeJS.ProcessEnv = process.env): InferenceConfig {
   if (cached) return cached;
-  const file = readDotEnv();
+  const file = readDotEnv(runtimeEnvDir);
   const base = loadBaseConfig(env, file);
   cached = {
     ...base,
@@ -60,6 +72,20 @@ export function loadInferenceConfig(env: NodeJS.ProcessEnv = process.env): Infer
   return cached;
 }
 
+/**
+ * Overlay runtime values (persisted settings) onto a loaded config WITHOUT
+ * reloading. Runs once at boot, before any request. Values already present
+ * in the process env still win (dev machines).
+ */
+export function applyRuntimeOverrides(
+  config: InferenceConfig,
+  overrides: { geminiApiKey?: string | null },
+): void {
+  if (overrides.geminiApiKey && !process.env.XENA_GEMINI_API_KEY) {
+    config.geminiApiKey = overrides.geminiApiKey;
+  }
+}
+
 /** Drop the cached config — next loadInferenceConfig re-reads .env. */
 export function invalidateConfigCache(): void {
   cached = null;
@@ -68,11 +94,14 @@ export function invalidateConfigCache(): void {
 /**
  * Re-read .env INTO the same config object long-lived holders captured.
  * Xena's restart-inference action calls this so scheduler/glances/sessions
- * see fresh provider settings without being reconstructed.
+ * see fresh provider settings without being reconstructed. Values overlaid
+ * at runtime (persisted settings, setup-entered key) survive the refresh.
  */
 export function refreshInPlace(config: InferenceConfig): InferenceConfig {
+  const overlaid = { geminiApiKey: config.geminiApiKey };
   const fresh = loadInferenceConfig();
   Object.assign(config, fresh);
+  applyRuntimeOverrides(config, overlaid);
   return config;
 }
 

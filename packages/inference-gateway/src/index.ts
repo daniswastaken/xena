@@ -6,7 +6,7 @@
  * state, classified errors). router9-client remains the transport layer
  * for the 9Router wire format and shared types.
  */
-export { loadInferenceConfig, invalidateConfigCache, refreshInPlace, type InferenceConfig } from "./config.js";
+export { loadInferenceConfig, invalidateConfigCache, refreshInPlace, applyRuntimeOverrides, setEnvDir, type InferenceConfig } from "./config.js";
 export { supervisor, resetInference, type ProviderId, type ProviderHealth, type ModelHealth } from "./supervisor.js";
 export { NineRouterChild, type NineRouterChildState, type ChildEvents } from "./child9router.js";
 export { InferenceError, type InferenceErrorKind } from "./errors.js";
