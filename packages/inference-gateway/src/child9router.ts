@@ -32,7 +32,10 @@ const PROBE_INTERVAL_MS = 60_000;
 const PROBE_TIMEOUT_MS = 5_000;
 const RESPAWN_BACKOFF_START_MS = 5_000;
 const RESPAWN_BACKOFF_CAP_MS = 30_000;
-const RESPAWN_MAX_ATTEMPTS = 5;
+// No respawn attempt cap: a slow first boot (cold disk) must not exhaust the
+// ladder and leave the rung dead for the whole session. A rung that keeps
+// dying retries forever, slowly; the provider breaker keeps request volume
+// off it while it's down.
 
 /** Resolve a spawn spec for 9Router. Returns [cmd, args, useShell]. */
 function resolveSpawnSpec(): { cmd: string; args: string[]; shell: boolean; env?: Record<string, string> } | null {
@@ -56,7 +59,6 @@ export class NineRouterChild {
   private probeTimer: NodeJS.Timeout | null = null;
   private respawnTimer: NodeJS.Timeout | null = null;
   private backoffMs = RESPAWN_BACKOFF_START_MS;
-  private respawnAttempts = 0;
   private probeFailures = 0;
   private disposed = false;
   /** Adopted = we never spawned this instance; never kill what we don't own. */
@@ -147,7 +149,6 @@ export class NineRouterChild {
       this.scheduleRespawn();
     });
     // Successful spawn resets the whole backoff ladder.
-    this.respawnAttempts = 0;
     this.backoffMs = RESPAWN_BACKOFF_START_MS;
     // Unref'd so the child never keeps a quitting Xena alive.
     child.unref();
@@ -185,8 +186,6 @@ export class NineRouterChild {
   private scheduleRespawn(): void {
     if (this.disposed) return;
     this.setState("down");
-    if (this.respawnAttempts >= RESPAWN_MAX_ATTEMPTS) return;
-    this.respawnAttempts++;
     const delay = this.backoffMs;
     this.backoffMs = Math.min(this.backoffMs * 2, RESPAWN_BACKOFF_CAP_MS);
     if (this.respawnTimer) clearTimeout(this.respawnTimer);
@@ -221,16 +220,18 @@ export class NineRouterChild {
       return;
     }
     this.probeFailures++;
-    // 3 consecutive probe failures on OUR child -> respawn it.
-    // An adopted instance the user killed stays down until it reappears —
-    // we never spawn over a port we don't own.
-    if (this.probeFailures >= 3 && this.child) {
+    // 3 consecutive probe failures -> respawn. When OUR child is sick we
+    // kill + restart it. When an ADOPTED instance died, the port is free
+    // again — take it over with our own child instead of leaving the rung
+    // dead until a manual tray restart (the "no auto recovery" failure).
+    if (this.probeFailures >= 3) {
       this.probeFailures = 0;
-      this.killChild();
+      if (this.child) {
+        this.killChild();
+      } else {
+        this.adopted = false;
+      }
       this.scheduleRespawn();
-    } else if (this.probeFailures >= 3) {
-      this.probeFailures = 0;
-      this.setState("down");
     }
   }
 }
