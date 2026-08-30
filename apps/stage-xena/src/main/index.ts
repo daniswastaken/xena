@@ -63,6 +63,61 @@ if (!gotLock) {
     const { win: avatar } = createAvatarWindow();
     bar = new BarWindow(() => void maybeGreetBack());
 
+    // Scheduler + gaze FIRST: the setup-flow onDone callback fires
+    // synchronously for non-first-run boots and touches the scheduler, so it
+    // must exist before SetupFlow is constructed. (Declaring it after the
+    // setup block was a TDZ ReferenceError that aborted the whole boot chain
+    // on every machine that already had .firstrun — no IPC handlers, no
+    // tray, "Xena can't reach her brain".)
+    let schedulerStarted = false;
+    const startScheduler = (): void => {
+      if (schedulerStarted) return;
+      schedulerStarted = true;
+      scheduler.start();
+    };
+
+    const scheduler = new ProactiveScheduler(
+      () => avatar,
+      settings,
+      config,
+      async (comment, mood) => {
+        const { voiceEnabled } = await settings.get();
+        if (!voiceEnabled) return;
+        const audio = await speakReply(comment, mood).catch(() => null);
+        if (audio) avatar.webContents.send("tts:audio", audio);
+      },
+      async () => {
+        // Flavor idle comments with a memory fragment about the last topic.
+        const dir = dataDir();
+        const store = new MemoryStore(dir);
+        const sessions = await store.listAll();
+        const latest = sessions
+          .sort((a, b) => (b.meta?.updatedAt ?? "").localeCompare(a.meta?.updatedAt ?? ""))
+          [0];
+        const lastUser = [...(latest?.messages ?? [])]
+          .reverse()
+          .find((m) => m.role === "user");
+        if (!latest || !lastUser || typeof lastUser.content !== "string") return "";
+        const hits = await new MemoryRecall(store, join(dir, "diary")).recall(
+          lastUser.content,
+          { excludeSessionId: latest.meta?.id, topK: 2 },
+        );
+        return renderRecallContext(hits);
+      },
+    );
+
+    const gazeInstance = new GazeTracker(
+      () => avatar,
+      async () => (await settings.get()).avatarEnabled,
+    );
+    gazeInstance.start();
+    gaze = gazeInstance;
+
+    // Register IPC handlers BEFORE the setup flow runs: renderer pages load
+    // immediately and probe channels (live2d-get) — a missing handler logged
+    // an error and any early chat send was dropped during boot.
+    registerIpcHandlers(config, settings, scheduler, bar, () => avatar, new PointerWindow(), gaze);
+
     // First-run setup flow. All UI lives in the avatar window — bar stays hidden
     // until the flow finishes (or is skipped on non-first-run).
     const setup = new SetupFlow(avatar, settings, config, () => {
@@ -70,7 +125,7 @@ if (!gotLock) {
       // For non-first-run, called immediately by setup.start().
       setupActive = false;
       avatar.setIgnoreMouseEvents(true, { forward: true });
-      scheduler.start();
+      startScheduler();
     });
     // Wire IPC before starting setup.
     ipcMain.on(CHANNELS.setupSubmit, (_e, text: unknown) => {
@@ -146,42 +201,6 @@ if (!gotLock) {
       }
     }
 
-  const scheduler = new ProactiveScheduler(
-    () => avatar,
-      settings,
-      config,
-      async (comment, mood) => {
-        const { voiceEnabled } = await settings.get();
-        if (!voiceEnabled) return;
-        const audio = await speakReply(comment, mood).catch(() => null);
-        if (audio) avatar.webContents.send("tts:audio", audio);
-      },
-      async () => {
-        // Flavor idle comments with a memory fragment about the last topic.
-        const dir = dataDir();
-        const store = new MemoryStore(dir);
-        const sessions = await store.listAll();
-        const latest = sessions
-          .sort((a, b) => (b.meta?.updatedAt ?? "").localeCompare(a.meta?.updatedAt ?? ""))
-          [0];
-        const lastUser = [...(latest?.messages ?? [])]
-          .reverse()
-          .find((m) => m.role === "user");
-        if (!latest || !lastUser || typeof lastUser.content !== "string") return "";
-        const hits = await new MemoryRecall(store, join(dir, "diary")).recall(
-          lastUser.content,
-          { excludeSessionId: latest.meta?.id, topK: 2 },
-        );
-        return renderRecallContext(hits);
-      },
-    );
-    const gazeInstance = new GazeTracker(
-      () => avatar,
-      async () => (await settings.get()).avatarEnabled,
-    );
-    gazeInstance.start();
-    gaze = gazeInstance;
-    registerIpcHandlers(config, settings, scheduler, bar, () => avatar, new PointerWindow(), gaze);
     // Glances are initiatives fired by the unified scheduler clock.
     const glances = new GlanceTimer(
       () => avatar,
@@ -199,7 +218,6 @@ if (!gotLock) {
     // Unified initiative clock: every 5-7 min either an ambient glance or
     // an AI-initiated comment (coin flip, per-feature settings gate each).
     scheduler.setGlanceHook(() => glances.glanceNow());
-    scheduler.start();
 
     shake = new ShakeDetector((x, y) => {
       void settings.get().then(({ shakeEnabled }) => {
