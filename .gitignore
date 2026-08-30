@@ -7,6 +7,6 @@ out/
 data/
 graphify-out/
 apps/stage-xena/release
-scripts
+apps/stage-xena/dist
 
 ~/
