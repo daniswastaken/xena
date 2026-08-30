@@ -243,6 +243,7 @@ export function registerIpcHandlers(
     }
     try {
       const session = await getSession();
+      console.log(`[chat] send start (${text.trim().slice(0, 40)})`);
       // Stream error surfaces only when nothing reached the bubble;
       // a partial reply stands as-is (ADR-001 no-restart invariant).
       let streamError: unknown = null;
@@ -263,6 +264,9 @@ export function registerIpcHandlers(
             thinkingShown = true;
             avatarWin().webContents.send(CHANNELS.chatThinking, true);
           }
+        },
+        onProvider: (providerUsed) => {
+          console.log(`[chat] reply done via ${providerUsed}`);
         },
       });
       if (streamError !== null && reply.trim() === "") {

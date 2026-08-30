@@ -41,6 +41,44 @@ process.env.ELECTRON_ENABLE_STACK_DUMPING = "0";
 // Tray companion must never die to an async straggler.
 process.on("unhandledRejection", () => undefined);
 
+// Sandbox/driver debug surface: CDP on 9223 when XENA_CDP=1.
+if (process.env.XENA_CDP === "1") {
+  app.commandLine.appendSwitch("remote-debugging-port", "9223");
+}
+
+// Debug log: mirror console lines to userData/xena-main.log when XENA_LOG=1
+// (packaged runs have no visible console — sandbox/driver E2E needs traces).
+if (process.env.XENA_LOG === "1") {
+  const { appendFileSync } = require("node:fs") as typeof import("node:fs");
+  const logPath = join(app.getPath("userData"), "xena-main.log");
+  const tee = (orig: (...data: unknown[]) => void, tag: string): ((...data: unknown[]) => void) => {
+    return (...data: unknown[]) => {
+      orig(...data);
+      try {
+        const parts = data.map((d) => {
+          if (typeof d === "string") return d;
+          if (d instanceof Error) return `${d.name}: ${d.message}\n${d.stack ?? ""}`;
+          try {
+            return JSON.stringify(d);
+          } catch {
+            return String(d);
+          }
+        });
+        appendFileSync(logPath, `[${new Date().toISOString()}] [${tag}] ${parts.join(" ")}\n`);
+      } catch {
+        /* best-effort */
+      }
+    };
+  };
+  console.log = tee(console.log.bind(console), "log");
+  console.error = tee(console.error.bind(console), "error");
+  try {
+    appendFileSync(logPath, `=== Xena main start ${new Date().toISOString()} ===\n`);
+  } catch {
+    /* best-effort */
+  }
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();

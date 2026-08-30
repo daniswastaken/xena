@@ -15,6 +15,8 @@ export interface SessionEvents {
   onError?: (error: Error) => void;
   /** Reasoning-model deltas before content starts (thinking indicator). */
   onReasoning?: (delta: string) => void;
+  /** Which rung served the reply (e.g. "gemini:gemini-2.5-flash"). */
+  onProvider?: (providerUsed: string) => void;
 }
 
 export interface SessionOptions {
@@ -83,7 +85,7 @@ export class Session {
     let accumulated = "";
     this.controller = new AbortController();
     try {
-      const { full } = await streamChatFailover(
+      const { full, providerUsed } = await streamChatFailover(
         payload,
         {
           model: this.model,
@@ -97,6 +99,7 @@ export class Session {
         },
         this.config,
       );
+      if (providerUsed) events.onProvider?.(providerUsed);
       await this.append({ role: "assistant", content: full });
       return full;
     } catch (error) {
