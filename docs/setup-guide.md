@@ -51,14 +51,17 @@ Open `.env` in the project root. It already has the 9Router key. Replace `XENA_G
 
 ```dotenv
 # Gemini — primary provider (free key: https://aistudio.google.com/app/apikey)
+# -latest aliases always point at the current flash models; do NOT pin
+# gemini-2.5-flash (deprecated upstream — 404 for new keys).
 XENA_GEMINI_API_KEY=AIzaSy...your-key-here...
-XENA_GEMINI_CHAT_MODEL=gemini-2.5-flash
-XENA_GEMINI_VISION_MODEL=gemini-2.5-flash
-XENA_GEMINI_LITE_MODEL=gemini-2.5-flash-lite
+XENA_GEMINI_CHAT_MODEL=gemini-flash-latest
+XENA_GEMINI_VISION_MODEL=gemini-flash-latest
+XENA_GEMINI_LITE_MODEL=gemini-flash-lite-latest
 
 # 9Router — supervised child rung (Xena spawns it at boot)
 ROUTER9_BASE_URL=http://localhost:20129/v1
-ROUTER9_API_KEY=sk-...your-local-9router-key...
+# Optional — Xena auto-adopts/mints a key from the child's DB when absent
+ROUTER9_API_KEY=
 XENA_NINEROUTER_ENABLED=1        # 0 = pure Gemini + Pollinations stack
 XENA_TEXT_MODEL=oc/big-pickle
 XENA_VISION_MODEL=oc/x-preview-f-free
@@ -71,12 +74,20 @@ XENA_POLLINATIONS_TEXT_MODEL=openai-fast
 
 **Provider chain** (per request, first healthy rung wins — see [`AGENTS.md`](../AGENTS.md) / ADR-004):
 
-1. **Gemini `gemini-2.5-flash`** — primary, chat + vision + STT, one free key
-2. **Gemini `gemini-2.5-flash-lite`** — same key, higher free rate limits
+1. **Gemini `gemini-flash-latest`** — primary, chat + vision + STT, one free key
+2. **Gemini `gemini-flash-lite-latest`** — same key, higher free rate limits
 3. **9Router** — reasoning (`oc/big-pickle`) + free `oc/*` fallbacks
 4. **Pollinations `openai-fast`** — keyless, zero-config, the chain never goes mute
 
-## 5. Run
+## 5. Run — packaged installer (no Node, no repo)
+
+Grab `Xena-setup-0.6.0.exe` and double-click. That's the whole install.
+
+- **Works with ZERO configuration**: no Gemini key, no `.env`, no 9Router key — the bundled 9Router gateway self-spawns, Xena mints/adopts its key from the child's DB (ADR-005), and the chain runs on `oc/*` free rungs with keyless Pollinations as the net
+- **Better with a Gemini key**: first-run setup asks for one; paste it and Gemini becomes the primary rung (chat + vision + voice input)
+- Installed userData lives at `%APPDATA%\@xena\stage-xena`; the tray's "Restart inference" re-reads config without restarting Xena
+
+## 6. Run — from source
 
 ```powershell
 pnpm build
@@ -85,7 +96,7 @@ pnpm start
 
 One command starts everything: Mao appears in the bottom-right corner, the inference stack (Gemini HTTPS instantly, 9Router spawned and supervised as a child) comes up with the app. Press `Ctrl+Alt+X` to summon the chat bar.
 
-## 6. Quick verification
+## 7. Quick verification
 
 | Try this | Expected |
 |---|---|
@@ -99,13 +110,13 @@ One command starts everything: Mao appears in the bottom-right corner, the infer
 | `Esc` | Dismisses the bar |
 | Tray icon → Avatar | Toggles Live2D visibility |
 
-## 7. Stopping / restarting
+## 8. Stopping / restarting
 
 - **Stop Xena**: right-click tray icon → Quit (the supervised 9Router child is tree-killed with it)
 - **Recovery without restarting**: tray → "Restart inference" clears cooldowns, re-reads `.env`, respawns the child
 - **Next session**: just `pnpm start` — no other terminal, no manual gateway
 
-## 8. Optional: dev mode
+## 9. Optional: dev mode
 
 For iterating on the renderer / main process:
 
