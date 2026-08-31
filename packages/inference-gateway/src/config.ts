@@ -24,7 +24,7 @@ export interface InferenceConfig extends Router9Config {
 }
 
 const DEFAULTS = {
-  geminiLiteModel: "gemini-2.5-flash-lite",
+  geminiLiteModel: "gemini-flash-lite-latest",
   pollinationsTextModel: "openai-fast",
   pollinationsVisionModel: "",
 } as const;
@@ -61,7 +61,7 @@ export function loadInferenceConfig(env: NodeJS.ProcessEnv = process.env): Infer
   const base = loadBaseConfig(env, file);
   cached = {
     ...base,
-    geminiLiteModel: env.XENA_GEMINI_LITE_MODEL ?? file.XENA_GEMINI_LITE_MODEL ?? DEFAULTS.geminiLiteModel,
+    geminiLiteModel: env.XENA_GEMINI_LITE_MODEL ?? file.XENA_GEMINI_LITE_MODEL ?? "gemini-flash-lite-latest",
     pollinationsTextModel:
       env.XENA_POLLINATIONS_TEXT_MODEL ?? file.XENA_POLLINATIONS_TEXT_MODEL ?? DEFAULTS.pollinationsTextModel,
     pollinationsVisionModel:
@@ -126,8 +126,8 @@ function loadBaseConfig(env: NodeJS.ProcessEnv, file: Record<string, string>): R
   return {
     baseUrl: (env.ROUTER9_BASE_URL ?? file.ROUTER9_BASE_URL ?? R9_DEFAULTS.baseUrl).replace(/\/+$/, ""),
     apiKey: env.ROUTER9_API_KEY ?? file.ROUTER9_API_KEY ?? "",
-    geminiChatModel: env.XENA_GEMINI_CHAT_MODEL ?? file.XENA_GEMINI_CHAT_MODEL ?? "gemini-2.5-flash",
-    geminiVisionModel: env.XENA_GEMINI_VISION_MODEL ?? file.XENA_GEMINI_VISION_MODEL ?? "gemini-2.5-flash",
+    geminiChatModel: env.XENA_GEMINI_CHAT_MODEL ?? file.XENA_GEMINI_CHAT_MODEL ?? "gemini-flash-latest",
+    geminiVisionModel: env.XENA_GEMINI_VISION_MODEL ?? file.XENA_GEMINI_VISION_MODEL ?? "gemini-flash-latest",
     geminiApiKey: env.XENA_GEMINI_API_KEY ?? file.XENA_GEMINI_API_KEY ?? null,
     textModel: env.XENA_TEXT_MODEL ?? file.XENA_TEXT_MODEL ?? R9_DEFAULTS.textModel,
     visionModel: env.XENA_VISION_MODEL ?? file.XENA_VISION_MODEL ?? R9_DEFAULTS.visionModel,

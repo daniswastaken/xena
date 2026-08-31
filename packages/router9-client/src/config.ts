@@ -37,8 +37,8 @@ export interface Router9Config {
 
 const DEFAULTS = {
   baseUrl: "http://localhost:20129/v1",
-  geminiChatModel: "gemini-2.0-flash",
-  geminiVisionModel: "gemini-2.0-flash",
+  geminiChatModel: "gemini-flash-latest",
+  geminiVisionModel: "gemini-flash-latest",
   textModel: "oc/big-pickle",
   visionModel: "oc/x-preview-f-free",
   fallbackTextModels: ["oc/laguna-s-2.1-free", "oc/mimo-v2.5-free"],

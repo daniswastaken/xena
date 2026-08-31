@@ -19,6 +19,7 @@ import { supervisor, type ProviderId } from "./supervisor.js";
 import { InferenceError } from "./errors.js";
 import { geminiComplete, geminiStream } from "./adapters/gemini.js";
 import { openaiComplete, openaiStream, type OpenAiTarget } from "./adapters/openai.js";
+import { notifyRouter9KeyWorking, notifyRouter9KeyRejected } from "./child9router.js";
 import { Router9Error, type ChatCompletionResult, type ChatMessage } from "@xena/router9-client";
 
 export type ChainUsage = "text" | "vision";
@@ -102,11 +103,16 @@ function isAbortError(error: unknown): boolean {
 function noteFailure(rung: Rung, error: unknown): void {
   const status = error instanceof Router9Error ? error.status : null;
   const message = error instanceof Error ? error.message : String(error);
+  console.log(`[inference] rung down: ${rung.provider}/${rung.model}${status !== null ? ` HTTP ${status}` : ""}: ${message.slice(0, 140)}`);
   if (status !== null && shouldEvictModel(status)) {
     supervisor.evictModel(rung.provider, rung.model, message);
   } else {
     supervisor.noteProviderFailure(rung.provider, message);
   }
+  // A 401 from the local 9Router means the configured key no longer
+  // matches the child's DB (rotated key / fresh machine) — let the child
+  // re-adopt the DB key on its next probe.
+  if (rung.provider === "router9" && status === 401) notifyRouter9KeyRejected();
 }
 
 function classifyChainFailure(errors: Array<{ rung: Rung; error: unknown }>): InferenceError {
@@ -196,6 +202,7 @@ async function walk(
     try {
       const result = await runOnRung(rung, messages, options, guarded);
       supervisor.noteProviderSuccess(rung.provider);
+      if (rung.provider === "router9") notifyRouter9KeyWorking();
       return result;
     } catch (error) {
       errors.push({ rung, error });
