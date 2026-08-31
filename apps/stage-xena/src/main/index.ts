@@ -199,11 +199,17 @@ if (!gotLock) {
     }
     // Wait for the avatar page to fully load before firing the greeting so its
     // setup listeners are subscribed before the first IPC arrives.
-    avatar.webContents.on("did-finish-load", () => {
-      avatar.webContents.send(CHANNELS.setupBegin);
-      setup.sendStep("greeting");
-      setup.sendBubble("Oh, Father! You're looking for me? Eh, you have something to give?", "surprised");
-    });
+    // First-run ONLY: did-finish-load also fires on renderer reloads and on
+    // every subsequent boot — sending setupBegin there re-ran onboarding each
+    // launch and re-armed the setup UI forever (the marker is only written at
+    // the END of the flow, so a mid-flow reload already re-entered it).
+    if (firstRun) {
+      avatar.webContents.on("did-finish-load", () => {
+        avatar.webContents.send(CHANNELS.setupBegin);
+        setup.sendStep("greeting");
+        setup.sendBubble("Oh, Father! You're looking for me? Eh, you have something to give?", "surprised");
+      });
+    }
 
     // Welcome-back: after 30+ min away, greet on corner summon (max 1/10min).
     let lastGreetAt = 0;

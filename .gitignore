@@ -10,3 +10,6 @@ apps/stage-xena/release
 apps/stage-xena/dist
 
 ~/
+sandbox-share/
+graphify-out/
+.playwright-mcp/

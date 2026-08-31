@@ -1,7 +1,7 @@
 {
   "name": "project-xena",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Neuro-sama-inspired AI desktop companion — corner Live2D avatar overlay",
   "packageManager": "pnpm@11.9.0",
   "scripts": {

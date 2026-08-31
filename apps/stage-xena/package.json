@@ -1,6 +1,6 @@
 {
   "name": "@xena/stage-xena",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "type": "commonjs",
   "description": "Xena desktop overlay app (Electron)",

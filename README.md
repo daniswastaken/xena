@@ -60,9 +60,10 @@ Shipped:
 - **v0.4 —** TTS feature.
 - **v0.5 —** Long term memory and knowledge.
 - **v0.6 —** Model auto recovery.
+- **v0.6.1 —** Packaged `.exe` distribution (NSIS) with bundled 9Router and fresh-machine key bootstrap — build it locally with `pnpm --filter @xena/stage-xena dist`.
 
 Planned:
-- **Release.** Windows `.exe` release are planned at v1.0.
+- **Release channel.** Hosted releases once a public repo/CI is set up; the Windows `.exe` itself is already shippable (see the [setup guide](docs/setup-guide.md), section 5).
 - **Real-time voice.** Streaming TTS pipeline replacing Edge read-aloud.
 
 ## What Can Xena Do?
