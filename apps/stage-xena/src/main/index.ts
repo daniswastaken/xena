@@ -90,8 +90,13 @@ if (!gotLock) {
   const settings = new SettingsStore(defaultSettingsPath(dataDir()));
   // Persisted Gemini key (from first-run setup) overlays file/env values;
   // process env still wins (dev machines, power users).
+  console.log(`[inference] settings path: ${defaultSettingsPath(dataDir())}`);
   void settings.get().then((persisted) => {
+    const before = config.geminiApiKey;
     applyRuntimeOverrides(config, { geminiApiKey: persisted.geminiApiKey });
+    console.log(
+      `[inference] gemini key: env=${process.env.XENA_GEMINI_API_KEY ? "yes" : "no"} settings=${persisted.geminiApiKey ? "yes" : "no"} applied=${before ? "yes" : "no"} -> ${config.geminiApiKey ? "active" : "none"}`,
+    );
   });
 
   let bar: BarWindow | null = null;
