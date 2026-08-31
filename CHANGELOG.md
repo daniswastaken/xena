@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.1 — 2026-08-31
+
+### Packaged distribution + fresh-machine 9Router (ADR-005)
+- **Fresh-machine key bootstrap** — the 9Router child's DB starts with ZERO
+  api keys (they're dashboard-created), so every Xena request 401'd on a
+  fresh install. `NineRouterChild` now adopts the child's newest active key,
+  or mints one with 9Router's own algorithm (machine-id + HMAC + default
+  secret) and inserts it into the child's sqlite DB via `node:sqlite`.
+  Validated live: minted key → HTTP 200 → 691 models → full chat roundtrip.
+- **Key self-heal** — a successful router9 request locks the key; a 401
+  re-opens DB sync, so dashboard key rotation heals within one probe (15s,
+  down from a 60s cadence that lagged cold boots by two full minutes)
+- **Gemini model aliases** — `gemini-2.5-flash` is deprecated upstream
+  (404); defaults now use pointer aliases `gemini-flash-latest` /
+  `gemini-flash-lite-latest` across gateway + router9-client
+- **Rung diagnostics** — per-rung failures log `[inference] rung down:
+  <provider>/<model> HTTP <status>`; settings-path + key-source logged at
+  boot (packaged userData is `%APPDATA%\@xena\stage-xena`, not `Xena`)
+- **Windows Sandbox E2E harness v6** (`scripts/sandbox-e2e.ps1` + `.wsb`) —
+  Win10 19044 LogonCommand is dead on this host, so the driver types into
+  the guest taskbar search box via host-side SendKeys/mouse_event + OCR
+  loop. 6 stages: silent install, no-key bubble chat with provider
+  attribution, 9Router kill/respawn, 3-rapid-send stress, with-key relaunch
+  asserting key overlay + gemini-first attempt, first-run setup flow
+  (greeting → yes → pasted key → persisted), silent uninstall
+  (exe gone, no orphan child), XENA_NINEROUTER_ENABLED=0 pure-stack mode,
+  footprint. **Run 14: ALL 8 STAGES GREEN** (bubble oracle now distinguishes
+  persona error lines from model replies)
+- **Key hygiene** — the seeded AI Studio key was flagged leaked by Google
+  (it sat in a committed test script); scrubbed from the repo, harness reads
+  the key from the mapped share (`C:\Shared\gemini-key.txt`). **Rotate the
+  key** — user action needed for Gemini-primary on any machine
+
 ## 0.3.0 — 2026-08-29
 
 ### Inference backend rework (ADR-004)

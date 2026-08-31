@@ -206,6 +206,7 @@ Memory line:
 - `docs/adr-002-live2d-pointer.md` — Mao as sole Live2D; AI Pointer window for guided tasks
 - `docs/adr-003-speech-bubble.md` — bubble replaces the chat window; mood-tinted, anchored to head
 - `docs/adr-004-inference-gateway.md` — inference gateway package; Gemini-primary chain; self-recovery layers; error surface boundary
+- `docs/adr-005-packaged-distribution.md` — NSIS distribution; fresh-machine 9Router key bootstrap (mint/adopt from the child's DB); gemini `-latest` model aliases; Windows Sandbox E2E harness
 
 If you make a new architectural decision (new package, new window, new IPC contract, new model selection strategy), drop a one-page ADR in `docs/adr-NNN-short-slug.md` and reference it from the table above.
 
