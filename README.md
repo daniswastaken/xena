@@ -7,11 +7,6 @@
 <p align="center">Your adorable daughter, a little witch living in the bottom-right corner of your screen. She watches your work, talks with you, sees your screen, remembers things you teach her, and occasionally pipes up on her own.</p>
 
 <p align="center">
-  [<a href="#development">Build it</a>]
-  [<a href="docs/setup-guide.md">Setup guide</a>]
-</p>
-
-<p align="center">
   <a href="https://github.com/moeru-ai/airi"><img alt="Inspired by Project AIRI" src="https://img.shields.io/badge/Inspired%20By-Project%20AIRI-22c55e?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTEyIDIxLjM1bC0xLjQ1LTEuMzJDNS40IDE1LjM2IDIgMTIuMjggMiA4LjUgMiA1LjQyIDQuNDIgMyA3LjUgM2MxLjc0IDAgMy40MS44MSA0LjUgMi4wOUMxMy4wOSAzLjgxIDE0Ljc2IDMgMTYuNSAzIDE5LjU4IDMgMjIgNS40MiAyMiA4LjVjMCAzLjc4LTMuNCA2Ljg3LTguNTUgMTEuNTRMMTIgMjEuMzV6Ii8%2BPC9zdmc%2B&logoColor=white&labelColor=1a1024" /></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%2010%2F11-3b82f6?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTMgNS41bDcuNS0xdjYuOEgzVjUuNXptMCAxM3YtNi4zaDcuNVYxOUwzIDE4LjV2LS4wek0xMS41IDQuM0wyMSAzdjguM2gtOS41VjQuM3ptMCAxNS40di03LjVIMjFWMjFsLTkuNS0xLjN6Ii8%2BPC9zdmc%2B&logoColor=white&labelColor=1a1024" />
   <img alt="Runtime" src="https://img.shields.io/badge/Electron-44-06b6d4?style=flat&logo=electron&logoColor=white&labelColor=1a1024" />
@@ -20,15 +15,20 @@
   <img alt="Footprint" src="https://img.shields.io/badge/RAM%20Footprint-~190%E2%80%93230%20MB-8b5cf6?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZD0iTTE1IDlIOXY2aDZWOXptLTIgNGgtMnYtMmgydjJ6bTgtMlY5aC0yVjdjMC0xLjEtLjktMi0yLTJoLTJWM2gtMnYyaC0yVjNIOXYySDdjLTEuMSAwLTIgLjktMiAydjJIM3YyaDJ2MkgzdjJoMnYyYzAgMS4xLjkgMiAyIDJoMnYyaDJ2LTJoMnYyaDJ2LTJoMmMxLjEgMCAyLS45IDItMnYtMmgydi0yaC0ydi0yaDJ6bS00IDZIN1Y3aDEwdjEweiIvPjwvc3ZnPg==&logoColor=white&labelColor=1a1024" />
 </p>
 
+<p align="center">
+  [<a href="#development">Build it</a>]
+  [<a href="docs/setup-guide.md">Setup guide</a>]
+</p>
+
 <p float="center" align="center">
   <a href="https://github.com/daniswastaken/xena/releases/latest">
-    <img width="32%" src="docs/download-buttons/download-buttons.windows.light.en-US.svg" alt="Download for Windows" />
+    <img width="32%" src="docs/buttons/download-win.svg" alt="Download for Windows" />
   </a>
   <a href="docs/setup-guide.md">
-    <img width="32%" src="docs/download-buttons/download-buttons.docs.light.en-US.svg" alt="Setup Guide" />
+    <img width="32%" src="docs/buttons/setup-guide.svg" alt="Setup Guide" />
   </a>
   <a href="https://github.com/daniswastaken/xena/issues/new">
-    <img width="32%" src="docs/download-buttons/download-buttons.issues.light.en-US.svg" alt="Request a Feature" />
+    <img width="32%" src="docs/buttons/request-feature.svg" alt="Request a Feature" />
   </a>
 </p>
 
