@@ -1,14 +1,14 @@
 # Setup Guide
 
-End-to-end setup for Project Xena on Windows 11. ~10 minutes if everything goes right.
+End-to-end setup for Project Xena on Windows 10/11. ~10 minutes if everything goes right.
 
 ## Prerequisites
 
 | Tool | Version | Why |
 |---|---|---|
 | **Node.js** | 26.x | Electron 44 + `node:sqlite` |
-| **pnpm** | 9.x | monorepo workspaces |
-| **Windows** | 11 | target machine; PowerShell 5.1 default |
+| **pnpm** | 11.x | monorepo workspaces |
+| **Windows** | 10 / 11 | target machine; PowerShell 5.1 default |
 | **9Router** | v0.5.55+ | AI gateway, runs on port `20129` |
 | **Google AI Studio key** | free tier | primary provider (chat + vision) |
 
@@ -18,7 +18,7 @@ The free tier is enough. No paid provider keys.
 
 ```powershell
 node --version    # should be v26.x; if not, install LTS from nodejs.org
-npm install -g pnpm@9
+npm install -g pnpm@11
 pnpm --version
 ```
 
@@ -81,7 +81,7 @@ XENA_POLLINATIONS_TEXT_MODEL=openai-fast
 
 ## 5. Run — packaged installer (no Node, no repo)
 
-Grab `Xena-setup-0.6.0.exe` and double-click. That's the whole install.
+Grab `xena-setup-0.6.1.exe` from [Releases](https://github.com/daniswastaken/xena/releases) and double-click. That's the whole install.
 
 - **Works with ZERO configuration**: no Gemini key, no `.env`, no 9Router key — the bundled 9Router gateway self-spawns, Xena mints/adopts its key from the child's DB (ADR-005), and the chain runs on `oc/*` free rungs with keyless Pollinations as the net
 - **Better with a Gemini key**: first-run setup asks for one; paste it and Gemini becomes the primary rung (chat + vision + voice input)

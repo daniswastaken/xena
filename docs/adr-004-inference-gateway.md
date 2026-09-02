@@ -27,6 +27,11 @@ parsing, shared types) and is no longer imported by apps directly.
 
 ### Chain (text)
 
+> **Amended by [ADR-005](adr-005-packaged-distribution.md)** (2026-08-31): the Gemini
+> rungs now use the pointer aliases `gemini-flash-latest` / `gemini-flash-lite-latest`;
+> `gemini-2.5-flash` is deprecated upstream (404 for new keys). The table below is
+> kept as originally decided.
+
 | Rung | Provider | Role |
 |---|---|---|
 | 1 | `gemini-2.5-flash` | primary text + vision + STT (one free AI Studio key) |

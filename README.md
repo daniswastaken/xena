@@ -1,6 +1,16 @@
-<div align="center">
-  <img width="720" src="docs/banner.avif" alt="Project Xena — daughter's corner Live2D avatar with summon bar" />
-</div>
+<picture>
+  <source
+    width="100%"
+    srcset="./docs/banner.avif"
+    media="(prefers-color-scheme: dark)"
+  />
+  <source
+    width="100%"
+    srcset="./docs/banner.avif"
+    media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)"
+  />
+  <img width="250" src="./docs/banner.avif" />
+</picture>
 
 <h1 align="center">Project Xena</h1>
 
@@ -35,7 +45,7 @@
 > Heavily inspired by [Neuro-sama](https://www.youtube.com/@Neurosama) and architecturally indebted to [Project AIRI](https://github.com/moeru-ai/airi).
 
 > [!TIP]
-> Xena is your **AI daughter**, a little witch who treats your desktop as her playground. She's clingy, affectionate, and always eager to help and watch you work.
+> Xena is your **AI daughter**, a little witch who treats your desktop as her playground. She's clingy, affectionate, and always eager to help and watch you work. Her birthday is May 4th.
 
 > [!NOTE]
 > All LLM and vision inference is **remote**, none of the heavy LLM computing are done locally.
@@ -60,11 +70,12 @@ Shipped:
 - **v0.4 —** TTS feature.
 - **v0.5 —** Long term memory and knowledge.
 - **v0.6 —** Model auto recovery.
-- **v0.6.1 —** Packaged `.exe` distribution (NSIS) with bundled 9Router and fresh-machine key bootstrap — build it locally with `pnpm --filter @xena/stage-xena dist`.
+- **v0.6.1 —** Packaged `.exe` distribution (NSIS) with bundled 9Router and fresh-machine key bootstrap — [grab the installer from Releases](https://github.com/daniswastaken/xena/releases) or build it locally with `pnpm --filter @xena/stage-xena dist`.
 
 Planned:
-- **Release channel.** Hosted releases once a public repo/CI is set up; the Windows `.exe` itself is already shippable (see the [setup guide](docs/setup-guide.md), section 5).
+- **CI release channel.** GitHub Actions building + hosting releases on tag; the Windows `.exe` is already shippable (see the [setup guide](docs/setup-guide.md), section 5).
 - **Real-time voice.** Streaming TTS pipeline replacing Edge read-aloud.
+- **Reliable vision.** Tracked in [#1](https://github.com/daniswastaken/xena/issues/1).
 
 ## What Can Xena Do?
 
@@ -121,10 +132,12 @@ The seed keys are already present. The interesting knobs:
 
 ```dotenv
 # Gemini — primary provider (free key: https://aistudio.google.com/app/apikey)
+# -latest aliases always point at the current flash models; gemini-2.5-flash
+# is deprecated upstream (404 for new keys) — do NOT pin it.
 XENA_GEMINI_API_KEY=AIza...
-XENA_GEMINI_CHAT_MODEL=gemini-2.5-flash
-XENA_GEMINI_VISION_MODEL=gemini-2.5-flash
-XENA_GEMINI_LITE_MODEL=gemini-2.5-flash-lite
+XENA_GEMINI_CHAT_MODEL=gemini-flash-latest
+XENA_GEMINI_VISION_MODEL=gemini-flash-latest
+XENA_GEMINI_LITE_MODEL=gemini-flash-lite-latest
 
 # 9Router — supervised child rung (spawned at app boot)
 ROUTER9_BASE_URL=http://localhost:20129/v1
@@ -159,7 +172,7 @@ flowchart LR
   end
 
   subgraph Remote[remote providers]
-    G[Gemini 2.5 Flash\ntext + vision]
+    G[Gemini Flash\ntext + vision]
     L[Gemini Flash-Lite\noverflow rung]
     Host[9Router :20129\noc/big-pickle\noc/x-preview-f-free\noc/* free models]
     P[Pollinations\nopenai-fast, keyless]
@@ -187,8 +200,8 @@ Xena walks a failover chain per request. The first healthy rung serves; failures
 
 | Provider | Role | Status |
 |---|---|---|
-| [Gemini](https://aistudio.google.com) `gemini-2.5-flash` | **Primary**: text + vision, one free AI Studio key | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
-| Gemini `gemini-2.5-flash-lite` | Overflow rung: same key, higher free rate limits | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| [Gemini](https://aistudio.google.com) `gemini-flash-latest` | **Primary**: text + vision, one free AI Studio key | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
+| Gemini `gemini-flash-lite-latest` | Overflow rung: same key, higher free rate limits | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
 | [9Router](https://github.com/9router/9router) `oc/*` | Reasoning rung (`oc/big-pickle`, `reasoning_content`) + free vision models, spawned & supervised by Xena at boot | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
 | [Pollinations](https://pollinations.ai) `openai-fast` | Keyless final net | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
 | Microsoft Edge read-aloud | Free TTS, JP `Nanami` voice | <img alt="active" src="https://img.shields.io/badge/Active-22c55e?style=flat-square&labelColor=1a1024" /> |
@@ -196,10 +209,10 @@ Xena walks a failover chain per request. The first healthy rung serves; failures
 
 ## Star History
 
-<a href="https://star-history.com/#daniswastaken/project-xena&Date">
+<a href="https://star-history.com/#daniswastaken/xena&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=daniswastaken/project-xena&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=daniswastaken/project-xena&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=daniswastaken/project-xena&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=daniswastaken/xena&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=daniswastaken/xena&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=daniswastaken/xena&type=Date" />
   </picture>
 </a>

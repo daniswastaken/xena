@@ -32,7 +32,7 @@ Implications:
 ## Infrastructure Already In Place (do not re-create)
 
 ### Inference chain — `packages/inference-gateway` (ADR-004)
-Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one key covers text + vision) → `gemini-2.5-flash-lite` (higher free RPD) → **9Router** `oc/big-pickle` + `oc/*` free models (reasoning rung) → **Pollinations** `openai-fast` (keyless final net). Vision: same Gemini rungs → 9Router `oc/x-preview-f-free` → `oc/mimo-v2.5-free`.
+Order (text): **Gemini `gemini-flash-latest`** (primary, free AI Studio key — one key covers text + vision) → `gemini-flash-lite-latest` (higher free RPD) → **9Router** `oc/big-pickle` + `oc/*` free models (reasoning rung) → **Pollinations** `openai-fast` (keyless final net). Vision: same Gemini rungs → 9Router `oc/x-preview-f-free` → `oc/mimo-v2.5-free`.
 - `apps/*` import `@xena/inference-gateway`; the gateway is the only `router9-client` consumer. Renderer never fetches directly.
 - Self-recovery: 404/empty evicts a model 10 min; 3 consecutive provider failures = 5-min offline; total-chain collapse auto-resets the supervisor; tray has "Restart inference" (never restarts Xena).
 - Errors classify into `InferenceError` kinds; main maps them to persona lines (`main/ui/error-lines.ts`) — raw provider text only ever reaches console + tray diagnostics.
@@ -47,7 +47,7 @@ Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one
 - If `/v1/models` fails while Xena runs: the child supervisor handles respawn; no agent action needed. Outside the app, the user may still start `9router` manually.
 
 ### Gemini — primary provider
-- Free AI Studio key in `.env` (`XENA_GEMINI_API_KEY`). Models: `gemini-2.5-flash` (chat + vision), `gemini-2.5-flash-lite` (overflow rung).
+- Free AI Studio key in `.env` (`XENA_GEMINI_API_KEY`). Models: `gemini-flash-latest` (chat + vision), `gemini-flash-lite-latest` (overflow rung) — `-latest` pointer aliases; `gemini-2.5-flash` is deprecated upstream (404 for new keys).
 - Health is inferred from request outcomes only — never probe Gemini for liveness (free-tier etiquette).
 
 ### OmniRoute — secondary router (exists, do not touch)
@@ -61,7 +61,7 @@ Order (text): **Gemini `gemini-2.5-flash`** (primary, free AI Studio key — one
 The monorepo discipline is from [Project AIRI](https://github.com/moeru-ai/airi) — feature-domain folders, one responsibility each, **apps import packages, packages never import apps**.
 
 ```
-project-xena/
+xena/
 ├── apps/
 │   └── stage-xena/                       # the Electron desktop app
 │       ├── src/
@@ -124,7 +124,7 @@ project-xena/
 │   └── tts/                              # free Edge read-aloud (MsEdgeTTS)
 │       ├── src/index.ts                  # JP Nanami lock, prosody, speak()
 │       └── scripts/                      # voice probes
-├── docs/                                 # ADRs, vision-model probe results, screenshots
+├── docs/                                 # ADRs, setup guide, vision-model probe results, banner/buttons
 ├── scripts/                              # CDP drivers, offline check suite
 ├── data/                                 # runtime: transcripts.db, facts.json, diary/
 ├── .env
@@ -173,7 +173,7 @@ When the user supplies a different/upgraded Live2D model it replaces Mao one-to-
 
 ## Current Status
 
-**v0.1 → v2.0 all shipped (2026-08-25 → 2026-08-27).** Phase = polish + maintenance + selective growth. See `CHANGELOG.md` for the chronological feature log; this section is just the headline.
+**v0.1 → v0.6.1 all shipped (2026-08-25 → 2026-08-31).** Phase = polish + maintenance + selective growth. See `CHANGELOG.md` for the chronological feature log; this section is just the headline.
 
 | Capability | Status | Notes |
 |---|---|---|
@@ -191,6 +191,7 @@ When the user supplies a different/upgraded Live2D model it replaces Mao one-to-
 | Proactive comments + glances | ✓ | unified 5-7 min randomized initiative clock, coin-flip pick, quiet-hours gate, tray toggles |
 | Single-instance lock | ✓ | |
 | Start with Windows | ✓ | opt-in |
+| Packaged `.exe` distribution | ✓ | NSIS, bundled 9Router, fresh-machine key bootstrap; alpha release `0.6.1` live on GitHub Releases (ADR-005) |
 | Real Live2D art from user | ✗ | next: one-to-one swap under `assets/live2d/<name>/` |
 | Real-time streaming TTS | ✗ | planned (replaces Edge read-aloud) |
 | Multi-channel integrations | ✗ | not scoped (Discord/Telegram/stream bot — out of scope) |
