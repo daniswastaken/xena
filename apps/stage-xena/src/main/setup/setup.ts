@@ -4,8 +4,9 @@
  * window — the bar is hidden during setup.
  */
 import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { app } from "electron";
 import { CHANNELS } from "../ipc/channels.js";
 import { dataDir } from "../paths.js";
 import { refreshInPlace, type InferenceConfig } from "@xena/inference-gateway";
@@ -16,16 +17,30 @@ export type SetupStep = "greeting" | "ask-key" | "decline" | "key-saved" | "sit-
 
 const GEMINI_KEY_RE = /^AIza[0-9A-Za-z_-]{35,}$/;
 
+/**
+ * Onboarding marker is version-keyed (`.firstrun-v<version>`): a fresh
+ * install of a new build re-asks on machines that never provided a key.
+ * The unversioned `.firstrun` from pre-0.6.2 builds is intentionally
+ * ignored — it could be stamped by an older test build sharing userData.
+ */
+function markerPath(version: string): string {
+  return join(dataDir(), `.firstrun-v${version}`);
+}
+
 export class SetupFlow {
   private step: SetupStep = "greeting";
   private audioEndHandlers: Array<() => void> = [];
+
+  private readonly version: string;
 
   constructor(
     private readonly avatar: Electron.BrowserWindow,
     private readonly settings: SettingsStore,
     private readonly config: InferenceConfig,
     private readonly onDone: () => void,
-  ) {}
+  ) {
+    this.version = app.getVersion();
+  }
 
   sendBubble(text: string, mood: string): void {
     this.avatar.webContents.send(CHANNELS.setupBubble, text);
@@ -41,8 +56,7 @@ export class SetupFlow {
   }
 
   async start(): Promise<boolean> {
-    const firstRun = !(await this.isFirstRunDone());
-    if (!firstRun) {
+    if (await this.isFirstRunDone()) {
       this.onDone();
       return false;
     }
@@ -129,20 +143,44 @@ export class SetupFlow {
     await this.waitForAudioEnd(6000);
     await sleep(500);
     await this.markFirstRunDone();
+    // Onboarding finished = this user has been met; the handlers.ts
+    // 90-second intro greeting must not also fire on the same machine.
+    await stampGreeted();
     this.avatar.webContents.send(CHANNELS.setupDone);
     this.onDone();
   }
 
   private async isFirstRunDone(): Promise<boolean> {
     try {
-      return existsSync(join(dataDir(), ".firstrun"));
+      if (existsSync(markerPath(this.version))) return true;
+      // Older builds stamped the unversioned marker AFTER completing the
+      // flow. Treat it as done ONLY when the machine already saved a key
+      // through it; a blank-key settings file means the flow never truly
+      // completed (test-run leftovers) — re-run onboarding.
+      if (existsSync(join(dataDir(), ".firstrun"))) {
+        const { geminiApiKey } = await this.settings.get();
+        if (geminiApiKey) return true;
+      }
+      return false;
     } catch {
       return false;
     }
   }
 
   private async markFirstRunDone(): Promise<void> {
-    await writeFile(join(dataDir(), ".firstrun"), new Date().toISOString(), "utf8");
+    const file = markerPath(this.version);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, new Date().toISOString(), "utf8");
+  }
+}
+
+/** Prevents the handlers.ts 90s first-meeting greeting on onboarded machines. */
+async function stampGreeted(): Promise<void> {
+  try {
+    await mkdir(dataDir(), { recursive: true });
+    await writeFile(join(dataDir(), ".greeted"), new Date().toISOString(), "utf8");
+  } catch {
+    // best-effort — worst case the intro greeting fires once
   }
 }
 

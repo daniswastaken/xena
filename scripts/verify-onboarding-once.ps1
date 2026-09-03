@@ -70,7 +70,7 @@ function Stop-Xena {
 
 # ---------- Boot 1: fresh (no marker) ----------
 Stop-Xena
-Remove-Item "$env:APPDATA\Xena\data\.firstrun", "$env:APPDATA\@xena\stage-xena\data\.firstrun" -Force -ErrorAction SilentlyContinue
+Get-ChildItem "$env:APPDATA\Xena\data", "$env:APPDATA\@xena\stage-xena\data" -Filter ".firstrun*" -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 $env:XENA_CDP = "1"; $env:XENA_LOG = "1"
 Start-Process -FilePath $Exe
 Start-Sleep -Seconds 40
@@ -96,7 +96,7 @@ Write-Host "boot1 setup dismissed after 'no': $done"
 Stop-Xena
 
 # ---------- Boot 2: marker present -> NO setup ----------
-$fr = (Test-Path "$env:APPDATA\Xena\data\.firstrun") -or (Test-Path "$env:APPDATA\@xena\stage-xena\data\.firstrun")
+$fr = (Test-Path "$env:APPDATA\Xena\data\.firstrun*") -or (Test-Path "$env:APPDATA\@xena\stage-xena\data\.firstrun*")
 Write-Host "firstrun marker after boot1: $fr"
 Start-Process -FilePath $Exe
 Start-Sleep -Seconds 40
