@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.2 — 2026-09-03
+
+### Setup + TTS fixes for the packaged 0.6.1 release
+- **Onboarding never ran on release installs (fix)** — the `.firstrun`
+  marker in `%APPDATA%\@xena\stage-xena\data\` could be stamped by an
+  earlier packaged test build sharing the same userData, silently
+  skipping the Gemini-key onboarding for the real install. The marker is
+  now version-keyed (`.firstrun-v<version>`): a fresh install of each new
+  build re-asks, and a legacy unversioned marker only counts when a key
+  was actually saved through it (blank-key settings = flow never
+  completed = re-run). Completing onboarding also stamps `.greeted` so
+  the 90-second first-meeting intro no longer double-fires.
+- **JP TTS lost its translation (fix)** — the keyless Google gtx
+  endpoint rate-limits hard per-IP (HTTP 429), and the silent fallback
+  fed English text to the ja-JP Nanami voice. Translation is now a
+  chain: gtx → MyMemory (free, no key) → original text, with a small
+  LRU+TTL cache so repeated replies never re-hit the network
+  (free-tier etiquette).
+
 ## 0.6.1 — 2026-08-31
 
 ### Packaged distribution + fresh-machine 9Router (ADR-005)
