@@ -1,6 +1,6 @@
 /** Interactive screen guidance: plan one visible action, wait for its result, repeat. */
 import { nativeImage, screen } from "electron";
-import { buildSystemPrompt, extractEmotion } from "@xena/xena-core";
+import { buildSystemPrompt, extractEmotion, extractFactTags } from "@xena/xena-core";
 import { visionCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
 import { captureScreenDataUrl } from "../capture/screenshot.js";
 import { CHANNELS } from "../ipc/channels.js";
@@ -195,7 +195,8 @@ Use continue when the user must perform another visible action. Use done only wh
   private async say(raw: string): Promise<void> {
     const parsed = extractEmotion(raw);
     const mood = parsed.emotion;
-    const clean = parsed.clean;
+    // Fact tags are protocol metadata — never displayed, never spoken.
+    const { clean } = extractFactTags(parsed.clean);
     if (clean === "") return;
     if (mood) this.hooks.emote(mood);
     this.hooks.send(clean);

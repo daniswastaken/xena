@@ -50,6 +50,15 @@ async function main(): Promise<void> {
   assert(factful.facts.length === 1 && factful.facts[0] === "user's name is Dan", "fact tag curated");
   assert(factful.clean === "Got it.", "fact tag stripped from speech");
   assert(cleanForDisplay("[smug] Noted. [fact: likes tea]") === "Noted.", "fact stripped in display cleanup");
+  // Truncated/unclosed fact tag (stream cut or model slip) must never leak.
+  const unclosed = extractFactTags("May 4th is my birthday, Father! [fact: Xena's birthday");
+  assert(unclosed.clean === "May 4th is my birthday, Father!", "unclosed fact tag stripped from speech");
+  assert(unclosed.facts.length === 1 && unclosed.facts[0] === "Xena's birthday", "unclosed fact tag still curated as fact");
+  assert(
+    cleanForDisplay("[happy] That's so exciting, Father! [fact: Xena's birthday") ===
+      "That's so exciting, Father!",
+    "unclosed fact tag stripped in display cleanup",
+  );
 
   // --- Recall -------------------------------------------------------------
   const dir = await mkdtemp(join(tmpdir(), "xena-recall-"));

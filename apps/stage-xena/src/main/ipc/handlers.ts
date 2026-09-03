@@ -114,10 +114,12 @@ export function registerIpcHandlers(
         config,
       );
       const { clean, emotion } = extractEmotion(result.content.trim());
-      if (clean === "") return;
+      // Fact tags are protocol metadata — never displayed, never spoken.
+      const { clean: line } = extractFactTags(clean);
+      if (line === "") return;
       avatarWin().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
-            avatarWin().webContents.send(CHANNELS.chatProactive, clean);
-      await maybeSpeak(clean);
+      avatarWin().webContents.send(CHANNELS.chatProactive, line);
+      await maybeSpeak(line);
     } catch {
       // greeting is best-effort
     }

@@ -44,6 +44,13 @@ export function extractEmotion(text: string): EmotionParseResult {
 // --- Fact tag protocol ------------------------------------------------------
 
 const FACT_RE = /\[fact:\s*([^\]]+)\]/gi;
+/**
+ * Unterminated fact tag (no closing bracket) — the model truncates or the
+ * stream cut mid-tag. Anchor at end-of-text so a trailing "[fact: ..."
+ * can never leak into display or TTS; the captured fragment still persists
+ * as a fact since the model clearly intended to save it.
+ */
+const UNCLOSED_FACT_RE = /\[fact:\s*([^\]\n]+?)\s*$/i;
 
 export interface FactParseResult {
   /** Text with all fact tags removed and trimmed. */
@@ -54,8 +61,12 @@ export interface FactParseResult {
 
 export function extractFactTags(text: string): FactParseResult {
   const facts: string[] = [];
-  const clean = text
-    .replace(FACT_RE, (_match, captured: string) => {
+  const noClosed = text.replace(FACT_RE, (_match, captured: string) => {
+    facts.push(captured.trim());
+    return "";
+  });
+  const clean = noClosed
+    .replace(UNCLOSED_FACT_RE, (_match, captured: string) => {
       facts.push(captured.trim());
       return "";
     })

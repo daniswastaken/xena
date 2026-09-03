@@ -6,7 +6,7 @@
  * Comments are one-shot completions and are NOT persisted to the transcript.
  */
 import { chatCompleteFailover, type InferenceConfig } from "@xena/inference-gateway";
-import { buildSystemPrompt, extractEmotion } from "@xena/xena-core";
+import { buildSystemPrompt, extractEmotion, extractFactTags } from "@xena/xena-core";
 import type { SettingsStore } from "../settings/store.js";
 import { CHANNELS } from "../ipc/channels.js";
 
@@ -139,10 +139,12 @@ export class ProactiveScheduler {
         this.config,
       );
       const { clean, emotion } = extractEmotion(result.content.trim());
-      if (clean === "") return;
-      this.getWindow().webContents.send(CHANNELS.chatProactive, clean);
+      // Fact tags are protocol metadata — never displayed, never spoken.
+      const { clean: line, facts } = extractFactTags(clean);
+      if (line === "" && facts.length === 0) return;
+      this.getWindow().webContents.send(CHANNELS.chatProactive, line);
       this.getWindow().webContents.send(CHANNELS.avatarEmote, emotion ?? "");
-      await this.onSpeak(clean, emotion ?? undefined);
+      await this.onSpeak(line, emotion ?? undefined);
     } catch {
       // Proactive comments are best-effort; stay silent on failure.
     }

@@ -12,7 +12,7 @@ import { registerIpcHandlers } from "./ipc/handlers.js";
 import { createTray } from "./tray/tray.js";
 import { loadInferenceConfig, refreshInPlace, supervisor, resetInference, NineRouterChild, applyRuntimeOverrides, setEnvDir } from "@xena/inference-gateway";
 import { chatCompleteFailover } from "@xena/inference-gateway";
-import { MemoryStore, MemoryRecall, renderRecallContext, extractEmotion, buildSystemPrompt } from "@xena/xena-core";
+import { MemoryStore, MemoryRecall, renderRecallContext, extractEmotion, extractFactTags, buildSystemPrompt } from "@xena/xena-core";
 import { SettingsStore, defaultSettingsPath } from "./settings/store.js";
 import { ProactiveScheduler } from "./proactive/scheduler.js";
 import { speakReply } from "./tts/speak.js";
@@ -245,12 +245,14 @@ if (!gotLock) {
           config,
         );
         const { clean, emotion } = extractEmotion(result.content.trim());
-        if (clean === "") return;
+        // Fact tags are protocol metadata — never displayed, never spoken.
+        const { clean: line } = extractFactTags(clean);
+        if (line === "") return;
         avatar.webContents.send(CHANNELS.avatarEmote, emotion ?? "");
-        avatar.webContents.send(CHANNELS.chatProactive, clean);
+        avatar.webContents.send(CHANNELS.chatProactive, line);
         const { voiceEnabled } = await settings.get();
         if (voiceEnabled) {
-          const audio = await speakReply(clean, emotion ?? undefined).catch(() => null);
+          const audio = await speakReply(line, emotion ?? undefined).catch(() => null);
           if (audio) avatar.webContents.send("tts:audio", audio);
         }
       } catch {
